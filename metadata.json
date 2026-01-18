@@ -1,0 +1,5 @@
+{
+  "name": "PoultryPro Manager",
+  "description": "A comprehensive farm management dashboard tailored for Rhode Island Red and Black Australorp poultry farms, featuring egg logging, incubation tracking, inventory, and financial records.",
+  "requestFramePermissions": []
+}
