@@ -1,10 +1,11 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Bird, Egg, Thermometer, DollarSign, Package, Settings, LogOut, Stethoscope } from 'lucide-react';
+import { LayoutDashboard, Bird, Egg, Thermometer, DollarSign, Package, Settings, LogOut, Stethoscope, Sparkles } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/ai-tools', icon: Sparkles, label: 'AI Assistant' },
     { to: '/flock', icon: Bird, label: 'Flock' },
     { to: '/health', icon: Stethoscope, label: 'Health Records' },
     { to: '/eggs', icon: Egg, label: 'Egg Logs' },
@@ -46,10 +47,18 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       <div className="p-4 border-t border-gray-800 space-y-1">
-        <button className="flex w-full items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors text-sm font-medium">
+        <NavLink 
+          to="/settings"
+          className={({ isActive }) =>
+              `flex w-full items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm font-medium
+              ${isActive 
+                ? 'text-white bg-gray-800' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'}`
+          }
+        >
           <Settings size={20} />
           Settings
-        </button>
+        </NavLink>
         <button className="flex w-full items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors text-sm font-medium">
           <LogOut size={20} />
           Sign Out

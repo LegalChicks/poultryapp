@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { MOCK_EGG_LOG } from '../constants';
 import { EggLogEntry } from '../types';
-import { Egg, AlertCircle, Calendar, Plus, Save, X, Edit2, TrendingUp } from 'lucide-react';
+import { Egg, AlertCircle, Calendar, Plus, Save, X, Edit2, TrendingUp, Trash2 } from 'lucide-react';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 export const EggLogManager: React.FC = () => {
-  const [logs, setLogs] = useState<EggLogEntry[]>(MOCK_EGG_LOG.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  const [logs, setLogs] = usePersistentState<EggLogEntry[]>('poultry_eggs', MOCK_EGG_LOG);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<Partial<EggLogEntry>>({
@@ -30,6 +31,13 @@ export const EggLogManager: React.FC = () => {
          setLogs([newLog, ...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
      }
      setShowModal(false);
+  };
+
+  const handleDelete = () => {
+      if(currentEntry.id && confirm("Delete this egg log?")) {
+          setLogs(logs.filter(l => l.id !== currentEntry.id));
+          setShowModal(false);
+      }
   };
 
   const openAddModal = () => {
@@ -176,20 +184,32 @@ export const EggLogManager: React.FC = () => {
                       </div>
                   </div>
 
-                  <div className="flex gap-3 mt-8">
-                      <button 
-                          onClick={() => setShowModal(false)}
-                          className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                          Cancel
-                      </button>
-                      <button 
-                          onClick={handleSave}
-                          className="flex-1 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors shadow-sm flex items-center justify-center gap-2"
-                      >
-                          <Save size={18} />
-                          Save Log
-                      </button>
+                  <div className="flex justify-between gap-3 mt-8">
+                      {isEditing && (
+                        <button 
+                            onClick={handleDelete}
+                            className="px-4 py-2.5 bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-100 transition-colors"
+                            title="Delete Log"
+                        >
+                            <Trash2 size={18} />
+                        </button>
+                      )}
+                      
+                      <div className="flex gap-3 flex-1">
+                          <button 
+                              onClick={() => setShowModal(false)}
+                              className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                              Cancel
+                          </button>
+                          <button 
+                              onClick={handleSave}
+                              className="flex-1 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+                          >
+                              <Save size={18} />
+                              Save Log
+                          </button>
+                      </div>
                   </div>
               </div>
             </div>

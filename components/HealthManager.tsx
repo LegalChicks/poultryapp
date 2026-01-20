@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { MOCK_HEALTH_RECORDS } from '../constants';
 import { HealthRecord, HealthEventType, Breed } from '../types';
-import { HeartPulse, Syringe, Stethoscope, Activity, Plus, Filter, Calendar, X, Save } from 'lucide-react';
+import { HeartPulse, Syringe, Stethoscope, Activity, Plus, Filter, Calendar, X, Save, Trash2 } from 'lucide-react';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 export const HealthManager: React.FC = () => {
-  const [records, setRecords] = useState<HealthRecord[]>(MOCK_HEALTH_RECORDS);
+  const [records, setRecords] = usePersistentState<HealthRecord[]>('poultry_health', MOCK_HEALTH_RECORDS);
   const [filterType, setFilterType] = useState<string>('All');
   
   // Modal State
@@ -53,6 +54,12 @@ export const HealthManager: React.FC = () => {
         cost: 0
     });
     setShowLogModal(true);
+  };
+
+  const handleDelete = (id: string) => {
+    if(confirm("Delete this health record?")) {
+        setRecords(records.filter(r => r.id !== id));
+    }
   };
 
   const handleSaveRecord = () => {
@@ -158,13 +165,21 @@ export const HealthManager: React.FC = () => {
                                     Target: <span className="text-gray-900">{record.subject}</span>
                                 </span>
                             </div>
-                            {record.outcome && (
-                                <span className={`text-xs font-medium px-2 py-1 rounded border
-                                    ${record.outcome === 'Recovered' ? 'bg-green-50 text-green-700 border-green-100' : 
-                                      record.outcome === 'Ongoing' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
-                                    {record.outcome}
-                                </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {record.outcome && (
+                                    <span className={`text-xs font-medium px-2 py-1 rounded border
+                                        ${record.outcome === 'Recovered' ? 'bg-green-50 text-green-700 border-green-100' : 
+                                        record.outcome === 'Ongoing' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
+                                        {record.outcome}
+                                    </span>
+                                )}
+                                <button 
+                                    onClick={() => handleDelete(record.id)}
+                                    className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
                         </div>
 
                         <h3 className="font-semibold text-gray-900 mb-1">{record.description}</h3>

@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { MOCK_BIRDS } from '../constants';
 import { Bird, Breed, BirdStage } from '../types';
-import { Search, Filter, MoreHorizontal, Plus, X, Save, Edit2, Users, User, Calendar } from 'lucide-react';
+import { Search, Filter, Plus, X, Save, Edit2, Users, User, Calendar, Calculator, Trash2 } from 'lucide-react';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 export const FlockManager: React.FC = () => {
-  const [birds, setBirds] = useState<Bird[]>(MOCK_BIRDS);
+  const [birds, setBirds] = usePersistentState<Bird[]>('poultry_birds', MOCK_BIRDS);
   const [filterBreed, setFilterBreed] = useState<string>('All');
   
   // Modal State
   const [showBirdModal, setShowBirdModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [recordType, setRecordType] = useState<'Individual' | 'Batch'>('Individual');
+  
+  // Incubation Calculator State
+  const [useIncubationCalc, setUseIncubationCalc] = useState(false);
+  const [incubationStart, setIncubationStart] = useState('');
   
   const [currentBird, setCurrentBird] = useState<Partial<Bird>>({
     tagNumber: '',
@@ -23,21 +28,23 @@ export const FlockManager: React.FC = () => {
     notes: ''
   });
 
+  const GESTATION_PERIODS: Record<string, number> = {
+    [Breed.RIR]: 21,
+    [Breed.BA]: 21,
+    [Breed.Other]: 21
+  };
+
   const filteredBirds = birds.filter(b => filterBreed === 'All' || b.breed === filterBreed);
 
-  // Helper for precise age
   const calculateAge = (hatchDateString: string) => {
     const hatchDate = new Date(hatchDateString);
     const today = new Date();
-    
-    // Normalize time portion to avoid timezone issues affecting day diff
     const utc1 = Date.UTC(hatchDate.getFullYear(), hatchDate.getMonth(), hatchDate.getDate());
     const utc2 = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-    
     const diffDays = Math.floor((utc2 - utc1) / (1000 * 60 * 60 * 24));
     
-    if (diffDays < 0) return 'Not Hatched';
-    if (diffDays === 0) return 'Today';
+    if (diffDays < 0) return `Hatching in ${Math.abs(diffDays)} days`;
+    if (diffDays === 0) return 'Hatching Today';
     if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
     
     const weeks = Math.floor(diffDays / 7);
@@ -51,9 +58,26 @@ export const FlockManager: React.FC = () => {
     return `${months} month${months !== 1 ? 's' : ''}`;
   };
 
+  useEffect(() => {
+    if (useIncubationCalc && incubationStart && currentBird.breed) {
+        const days = GESTATION_PERIODS[currentBird.breed] || 21;
+        const [y, m, d] = incubationStart.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        date.setDate(date.getDate() + days);
+        
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        
+        setCurrentBird(prev => ({...prev, hatchDate: `${year}-${month}-${day}`}));
+    }
+  }, [useIncubationCalc, incubationStart, currentBird.breed]);
+
   const openAddModal = () => {
     setIsEditing(false);
     setRecordType('Individual');
+    setUseIncubationCalc(false);
+    setIncubationStart('');
     setCurrentBird({
         tagNumber: '',
         name: '',
@@ -69,16 +93,23 @@ export const FlockManager: React.FC = () => {
 
   const openEditModal = (bird: Bird) => {
     setIsEditing(true);
-    // Determine type based on count
     setRecordType(bird.count > 1 ? 'Batch' : 'Individual');
+    setUseIncubationCalc(false);
+    setIncubationStart('');
     setCurrentBird({ ...bird });
     setShowBirdModal(true);
+  };
+
+  const confirmDelete = (id: string) => {
+      if(confirm("Are you sure you want to permanently delete this record?")) {
+          setBirds(birds.filter(b => b.id !== id));
+          if (showBirdModal) setShowBirdModal(false);
+      }
   };
 
   const handleSaveBird = () => {
     if (!currentBird.tagNumber) return;
 
-    // Ensure count is 1 for individuals
     const finalCount = recordType === 'Individual' ? 1 : Math.max(1, currentBird.count || 1);
 
     if (isEditing && currentBird.id) {
@@ -167,70 +198,80 @@ export const FlockManager: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Breed</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Stage</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Age (Current)</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Age</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredBirds.map((bird) => (
-                <tr key={bird.id} className="hover:bg-gray-50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white relative
-                        ${bird.breed === Breed.RIR ? 'bg-red-700' : 'bg-gray-800'}`}>
-                        {bird.breed === Breed.RIR ? 'RR' : 'BA'}
-                        {bird.count > 1 && (
-                            <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-white">
-                                B
+              {filteredBirds.map((bird) => {
+                const ageText = calculateAge(bird.hatchDate);
+                const isFuture = ageText.includes('Hatching');
+                
+                return (
+                  <tr key={bird.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white relative
+                          ${bird.breed === Breed.RIR ? 'bg-red-700' : 'bg-gray-800'}`}>
+                          {bird.breed === Breed.RIR ? 'RR' : 'BA'}
+                          {bird.count > 1 && (
+                              <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-white">
+                                  B
+                              </span>
+                          )}
+                        </div>
+                        <div>
+                            <span className="font-medium text-gray-900 block">{bird.tagNumber}</span>
+                            {bird.name && <span className="text-xs text-gray-500 block">{bird.name}</span>}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                        {bird.count > 1 ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                                <Users size={12} />
+                                Batch ({bird.count})
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                <User size={12} />
+                                Single
                             </span>
                         )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{bird.breed}</td>
+                    <td className="px-6 py-4">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
+                        {bird.stage}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600 font-medium">
+                      <div className={`flex items-center gap-1.5 ${isFuture ? 'text-amber-600' : ''}`}>
+                          <Calendar size={14} className={isFuture ? 'text-amber-500' : 'text-gray-400'}/>
+                          {ageText}
                       </div>
-                      <div>
-                          <span className="font-medium text-gray-900 block">{bird.tagNumber}</span>
-                          {bird.name && <span className="text-xs text-gray-500 block">{bird.name}</span>}
+                    </td>
+                    <td className="px-6 py-4">
+                       <span className={`flex items-center gap-1.5 text-sm font-medium
+                          ${bird.status === 'Active' ? 'text-green-600' : 'text-gray-500'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${bird.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                          {bird.status}
+                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                          <button onClick={() => openEditModal(bird)} className="text-gray-400 hover:text-amber-600 transition-colors p-1" title="Edit">
+                            <Edit2 size={18} />
+                          </button>
+                          <button onClick={() => confirmDelete(bird.id)} className="text-gray-400 hover:text-red-600 transition-colors p-1" title="Delete">
+                            <Trash2 size={18} />
+                          </button>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                      {bird.count > 1 ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
-                              <Users size={12} />
-                              Batch ({bird.count})
-                          </span>
-                      ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                              <User size={12} />
-                              Single
-                          </span>
-                      )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{bird.breed}</td>
-                  <td className="px-6 py-4">
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
-                      {bird.stage}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600 font-medium">
-                    <div className="flex items-center gap-1.5">
-                        <Calendar size={14} className="text-gray-400"/>
-                        {calculateAge(bird.hatchDate)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                     <span className={`flex items-center gap-1.5 text-sm font-medium
-                        ${bird.status === 'Active' ? 'text-green-600' : 'text-gray-500'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${bird.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                        {bird.status}
-                     </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => openEditModal(bird)} className="text-gray-400 hover:text-amber-600 transition-colors">
-                      <Edit2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -239,7 +280,7 @@ export const FlockManager: React.FC = () => {
       {/* Add / Edit Bird Modal */}
       {showBirdModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 overflow-y-auto max-h-[90vh]">
                   <div className="flex justify-between items-center mb-6">
                       <h3 className="text-xl font-bold text-gray-900">{isEditing ? 'Edit Record' : 'Add to Flock'}</h3>
                       <button onClick={() => setShowBirdModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -329,17 +370,59 @@ export const FlockManager: React.FC = () => {
                           </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Hatch Date</label>
-                              <input 
-                                  type="date" 
-                                  value={currentBird.hatchDate} 
-                                  onChange={(e) => setCurrentBird({...currentBird, hatchDate: e.target.value})}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                              />
+                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                          <div className="flex items-center justify-between mb-2">
+                             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                 <Calendar size={14} />
+                                 Hatching Schedule
+                             </label>
+                             <button 
+                                onClick={() => setUseIncubationCalc(!useIncubationCalc)}
+                                className={`text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1
+                                ${useIncubationCalc ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-white text-gray-500 border-gray-200'}`}
+                             >
+                                <Calculator size={12} />
+                                {useIncubationCalc ? 'Manual Entry' : 'Calculate from Set Date'}
+                             </button>
                           </div>
-                          <div>
+
+                          {useIncubationCalc ? (
+                              <div className="space-y-3">
+                                  <div>
+                                     <label className="block text-xs text-gray-500 mb-1">Incubation Start Date (Eggs Set)</label>
+                                     <input 
+                                          type="date" 
+                                          value={incubationStart} 
+                                          onChange={(e) => setIncubationStart(e.target.value)}
+                                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
+                                      />
+                                  </div>
+                                  <div className="flex justify-between items-center text-sm pt-1">
+                                      <span className="text-gray-500">Gestation ({currentBird.breed}):</span>
+                                      <span className="font-medium">21 Days</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-sm border-t border-gray-200 pt-2 mt-2">
+                                      <span className="text-gray-900 font-medium">Projected Hatch:</span>
+                                      <span className="text-amber-600 font-bold">
+                                          {currentBird.hatchDate ? new Date(currentBird.hatchDate).toLocaleDateString() : '-'}
+                                      </span>
+                                  </div>
+                              </div>
+                          ) : (
+                             <div>
+                                  <label className="block text-xs text-gray-500 mb-1">Hatch Date</label>
+                                  <input 
+                                      type="date" 
+                                      value={currentBird.hatchDate} 
+                                      onChange={(e) => setCurrentBird({...currentBird, hatchDate: e.target.value})}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                                  />
+                             </div>
+                          )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="col-span-2">
                                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                                <select 
                                   value={currentBird.status}
@@ -364,20 +447,32 @@ export const FlockManager: React.FC = () => {
                       </div>
                   </div>
 
-                  <div className="flex gap-3 mt-8">
-                      <button 
-                          onClick={() => setShowBirdModal(false)}
-                          className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                          Cancel
-                      </button>
-                      <button 
-                          onClick={handleSaveBird}
-                          className="flex-1 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm flex items-center justify-center gap-2"
-                      >
-                          <Save size={18} />
-                          {isEditing ? 'Save Changes' : (recordType === 'Batch' ? 'Create Batch' : 'Register Bird')}
-                      </button>
+                  <div className="flex justify-between gap-3 mt-8">
+                      {isEditing && (
+                        <button 
+                            onClick={() => confirmDelete(currentBird.id!)}
+                            className="px-4 py-2.5 bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-100 transition-colors"
+                            title="Delete Record"
+                        >
+                            <Trash2 size={18} />
+                        </button>
+                      )}
+                      
+                      <div className="flex gap-3 flex-1">
+                        <button 
+                            onClick={() => setShowBirdModal(false)}
+                            className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={handleSaveBird}
+                            className="flex-1 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm flex items-center justify-center gap-2"
+                        >
+                            <Save size={18} />
+                            {isEditing ? 'Save Changes' : (recordType === 'Batch' ? 'Create Batch' : 'Register Bird')}
+                        </button>
+                      </div>
                   </div>
               </div>
           </div>
