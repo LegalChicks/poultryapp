@@ -25,7 +25,10 @@ export const Dashboard: React.FC = () => {
 
   // 2. Egg Stats
   const today = new Date().toISOString().split('T')[0];
-  const todaysEggs = eggLogs.find(l => l.date === today)?.count || 0;
+  // Sum all logs for today, as there might be separate logs for different breeds
+  const todaysEggs = eggLogs
+    .filter(l => l.date === today)
+    .reduce((acc, curr) => acc + curr.count, 0);
   
   // 3. Finance Stats
   const currentMonth = new Date().getMonth();
@@ -48,9 +51,17 @@ export const Dashboard: React.FC = () => {
     ? Math.round(((recentHatch.hatchedCount || 0) / recentHatch.fertileCount) * 100) 
     : 0;
 
-  // 5. Chart Data (Last 14 entries)
+  // 5. Chart Data (Last 14 days, aggregated)
   const chartData = useMemo(() => {
-    return [...eggLogs]
+    // Group by date first
+    const grouped = eggLogs.reduce((acc, log) => {
+        acc[log.date] = (acc[log.date] || 0) + log.count;
+        return acc;
+    }, {} as Record<string, number>);
+
+    // Convert to array and sort
+    return Object.entries(grouped)
+        .map(([date, count]) => ({ date, count }))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(-14);
   }, [eggLogs]);

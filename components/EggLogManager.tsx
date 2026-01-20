@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MOCK_EGG_LOG } from '../constants';
-import { EggLogEntry } from '../types';
+import { EggLogEntry, Breed } from '../types';
 import { Egg, AlertCircle, Calendar, Plus, Save, X, Edit2, TrendingUp, Trash2 } from 'lucide-react';
 import { usePersistentState } from '../hooks/usePersistentState';
 
@@ -12,7 +12,8 @@ export const EggLogManager: React.FC = () => {
     date: new Date().toISOString().split('T')[0],
     count: 0,
     damaged: 0,
-    notes: ''
+    notes: '',
+    breed: 'Mixed'
   });
 
   const handleSave = () => {
@@ -26,7 +27,8 @@ export const EggLogManager: React.FC = () => {
              date: currentEntry.date,
              count: Number(currentEntry.count),
              damaged: Number(currentEntry.damaged || 0),
-             notes: currentEntry.notes
+             notes: currentEntry.notes,
+             breed: currentEntry.breed as any
          };
          setLogs([newLog, ...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
      }
@@ -46,7 +48,8 @@ export const EggLogManager: React.FC = () => {
         date: new Date().toISOString().split('T')[0],
         count: 0,
         damaged: 0,
-        notes: ''
+        notes: '',
+        breed: 'Mixed'
       });
       setShowModal(true);
   };
@@ -60,7 +63,9 @@ export const EggLogManager: React.FC = () => {
   // Stats
   const totalEggs = logs.reduce((acc, curr) => acc + curr.count, 0);
   const totalDamaged = logs.reduce((acc, curr) => acc + curr.damaged, 0);
-  const avgEggs = logs.length > 0 ? Math.round(totalEggs / logs.length) : 0;
+  // Avg calculation logic (approximate distinct days)
+  const distinctDays = new Set(logs.map(l => l.date)).size;
+  const avgEggs = distinctDays > 0 ? Math.round(totalEggs / distinctDays) : 0;
 
   return (
     <div className="space-y-6">
@@ -102,6 +107,7 @@ export const EggLogManager: React.FC = () => {
                 <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
                         <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Date</th>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Breed Source</th>
                         <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Collected</th>
                         <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Damaged</th>
                         <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Good</th>
@@ -115,6 +121,14 @@ export const EggLogManager: React.FC = () => {
                             <td className="px-6 py-4 flex items-center gap-2">
                                 <Calendar size={14} className="text-gray-400" />
                                 {new Date(log.date).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded text-xs font-medium 
+                                    ${log.breed === Breed.RIR ? 'bg-red-50 text-red-700' : 
+                                      log.breed === Breed.BA ? 'bg-gray-100 text-gray-700' : 
+                                      'bg-amber-50 text-amber-700'}`}>
+                                    {log.breed || 'Mixed'}
+                                </span>
                             </td>
                             <td className="px-6 py-4 font-medium">{log.count}</td>
                             <td className={`px-6 py-4 ${log.damaged > 0 ? 'text-red-600 font-medium' : 'text-gray-400'}`}>{log.damaged}</td>
@@ -152,6 +166,19 @@ export const EggLogManager: React.FC = () => {
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
                           />
                       </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Breed / Source</label>
+                          <select 
+                                value={currentEntry.breed}
+                                onChange={(e) => setCurrentEntry({...currentEntry, breed: e.target.value as any})}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
+                            >
+                                <option value="Mixed">Mixed / All Flock</option>
+                                <option value={Breed.RIR}>{Breed.RIR}</option>
+                                <option value={Breed.BA}>{Breed.BA}</option>
+                                <option value={Breed.Other}>{Breed.Other}</option>
+                            </select>
+                      </div>
                       <div className="grid grid-cols-2 gap-4">
                            <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Total Collected</label>
@@ -163,7 +190,7 @@ export const EggLogManager: React.FC = () => {
                               />
                           </div>
                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Damaged / Cracked</label>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Damaged</label>
                               <input 
                                   type="number" 
                                   value={currentEntry.damaged}

@@ -1,3 +1,4 @@
+
 export enum Breed {
   RIR = 'Rhode Island Red',
   BA = 'Black Australorp',
@@ -43,6 +44,7 @@ export interface EggLogEntry {
   count: number;
   damaged: number;
   notes?: string;
+  breed?: Breed | 'Mixed';
 }
 
 export interface IncubationBatch {
