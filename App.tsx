@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
@@ -12,11 +12,19 @@ import { Settings } from './components/Settings';
 import { AIHub } from './components/AIHub';
 
 const App: React.FC = () => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   return (
     <Router>
       <div className="min-h-screen flex bg-gray-50 font-sans">
-        <Sidebar />
-        <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen">
+        <Sidebar 
+          isCollapsed={isSidebarCollapsed} 
+          toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+        />
+        <main 
+          className={`flex-1 p-8 overflow-y-auto h-screen transition-all duration-300 
+          ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}
+        >
           <div className="max-w-7xl mx-auto">
             <Routes>
               <Route path="/" element={<Dashboard />} />
