@@ -10,16 +10,24 @@ import { HealthManager } from './components/HealthManager';
 import { EggLogManager } from './components/EggLogManager';
 import { Settings } from './components/Settings';
 import { AIHub } from './components/AIHub';
+import { Login } from './components/Login';
+import { usePersistentState } from './hooks/usePersistentState';
 
 const App: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = usePersistentState<boolean>('poultry_auth_status', false);
+
+  if (!isAuthenticated) {
+    return <Login onLogin={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <Router>
       <div className="min-h-screen flex bg-gray-50 font-sans">
         <Sidebar 
           isCollapsed={isSidebarCollapsed} 
-          toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+          toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onLogout={() => setIsAuthenticated(false)}
         />
         <main 
           className={`flex-1 p-8 overflow-y-auto h-screen transition-all duration-300 

@@ -91,3 +91,19 @@ export interface HealthRecord {
   veterinarian?: string;
   notes?: string;
 }
+
+export interface ManualTask {
+  id: string;
+  description: string;
+  dueDate: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface LoginLog {
+  id: string;
+  timestamp: string;
+  ipAddress: string;
+  deviceInfo: string;
+  status: 'Success' | 'Failed';
+}

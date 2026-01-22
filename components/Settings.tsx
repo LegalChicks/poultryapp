@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Save, Trash2, Database, AlertTriangle, CheckCircle, RefreshCw, Power, X } from 'lucide-react';
+import { Save, Trash2, Database, AlertTriangle, CheckCircle, RefreshCw, Power, X, Shield, Smartphone, Globe, Monitor } from 'lucide-react';
+import { LoginLog } from '../types';
 
 export const Settings: React.FC = () => {
   const [farmName, setFarmName] = useState(() => localStorage.getItem('poultry_farm_name') || 'PoultryPro Farm');
@@ -9,6 +10,9 @@ export const Settings: React.FC = () => {
   // Modal state for dangerous actions
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  // Logs
+  const logs: LoginLog[] = JSON.parse(localStorage.getItem('poultry_login_logs') || '[]');
 
   const handleSave = () => {
     localStorage.setItem('poultry_farm_name', farmName);
@@ -21,40 +25,56 @@ export const Settings: React.FC = () => {
 
   const executeStartFresh = () => {
     if (deleteConfirmation === 'DELETE') {
-       // Identify specific data keys to wipe. 
-       // We do NOT use localStorage.clear() to avoid losing settings or other unrelated data.
        const keysToReset = [
          'poultry_birds',
          'poultry_eggs',
          'poultry_health',
          'poultry_inventory',
          'poultry_incubation',
-         'poultry_finance'
+         'poultry_finance',
+         'poultry_tasks',
+         'poultry_login_logs'
        ];
        
-       // Overwrite with empty arrays to clear data but prevent fallback to Mock data
        keysToReset.forEach(key => localStorage.setItem(key, '[]'));
-       
-       // Reload the application to re-initialize state with empty data
        window.location.reload();
     }
   };
 
   const handleResetDefaults = () => {
       if (confirm('Reset all data to sample demonstration data? Existing records will be lost.')) {
-        // To restore defaults (Mocks), we remove the keys so the hooks fall back to initial values.
         const keysToReset = [
             'poultry_birds',
             'poultry_eggs',
             'poultry_health',
             'poultry_inventory',
             'poultry_incubation',
-            'poultry_finance'
+            'poultry_finance',
+            'poultry_tasks'
         ];
         keysToReset.forEach(key => localStorage.removeItem(key));
-        
         window.location.reload();
       }
+  };
+
+  const getDeviceName = (userAgent: string) => {
+    let browser = "Unknown Browser";
+    if (userAgent.includes("Firefox")) browser = "Firefox";
+    else if (userAgent.includes("SamsungBrowser")) browser = "Samsung Internet";
+    else if (userAgent.includes("Opera") || userAgent.includes("OPR")) browser = "Opera";
+    else if (userAgent.includes("Trident")) browser = "Internet Explorer";
+    else if (userAgent.includes("Edge")) browser = "Edge";
+    else if (userAgent.includes("Chrome")) browser = "Chrome";
+    else if (userAgent.includes("Safari")) browser = "Safari";
+
+    let os = "Unknown OS";
+    if (userAgent.includes("Win")) os = "Windows";
+    else if (userAgent.includes("Mac")) os = "MacOS";
+    else if (userAgent.includes("Linux")) os = "Linux";
+    else if (userAgent.includes("Android")) os = "Android";
+    else if (userAgent.includes("iPhone") || userAgent.includes("iPad")) os = "iOS";
+
+    return `${browser} on ${os}`;
   };
 
   return (
@@ -97,6 +117,61 @@ export const Settings: React.FC = () => {
         </div>
       </div>
 
+      {/* Login Logs */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <Shield size={20} className="text-gray-400" />
+            Security Logs
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">Recent activity and device logins.</p>
+        
+        <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
+            <table className="w-full text-left text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th className="px-4 py-3 font-medium text-gray-600">Time</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">IP Address</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Device Name</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Status</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                    {logs.length > 0 ? logs.map(log => (
+                        <tr key={log.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
+                            <td className="px-4 py-2.5">
+                                <div className="flex items-center gap-2 text-gray-700 font-mono text-xs">
+                                    <Globe size={14} className="text-gray-400" />
+                                    {log.ipAddress}
+                                </div>
+                            </td>
+                            <td className="px-4 py-2.5 text-gray-500 max-w-sm" title={log.deviceInfo}>
+                                <div className="flex items-center gap-3">
+                                     <div className="p-1.5 bg-gray-100 rounded-md">
+                                        {log.deviceInfo.includes("Mobile") ? <Smartphone size={14} /> : <Monitor size={14} />}
+                                     </div>
+                                     <div className="flex flex-col">
+                                         <span className="text-sm font-medium text-gray-700">{getDeviceName(log.deviceInfo)}</span>
+                                         <span className="text-[10px] text-gray-400 truncate max-w-[200px]">{log.deviceInfo}</span>
+                                     </div>
+                                </div>
+                            </td>
+                            <td className="px-4 py-2.5">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${log.status === 'Success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                    {log.status}
+                                </span>
+                            </td>
+                        </tr>
+                    )) : (
+                        <tr>
+                            <td colSpan={4} className="px-4 py-6 text-center text-gray-400 italic">No logs found.</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+      </div>
+
       {/* Data Management */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -127,7 +202,7 @@ export const Settings: React.FC = () => {
       </div>
       
       <div className="text-center text-xs text-gray-400 mt-8">
-          PoultryPro Manager v1.3.2 • Local Storage Persistence Enabled
+          PoultryPro Manager v1.4.1 • Local Storage Persistence Enabled
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -156,6 +231,8 @@ export const Settings: React.FC = () => {
                             <li>Inventory</li>
                             <li>Incubation Batches</li>
                             <li>Financial Transactions</li>
+                            <li>Pending Tasks</li>
+                            <li>Security Logs</li>
                         </ul>
                         Your <strong>Farm Name</strong> and <strong>Currency</strong> settings will be preserved.
                         <br/><br/>

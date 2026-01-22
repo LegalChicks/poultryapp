@@ -5,9 +5,10 @@ import { LayoutDashboard, Bird, Egg, Thermometer, DollarSign, Package, Settings,
 interface SidebarProps {
   isCollapsed: boolean;
   toggleSidebar: () => void;
+  onLogout: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar, onLogout }) => {
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/ai-tools', icon: Sparkles, label: 'AI Assistant' },
@@ -80,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) 
           <span className={`transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>Settings</span>
         </NavLink>
         <button 
+            onClick={onLogout}
             className={`flex w-full items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors text-sm font-medium whitespace-nowrap ${isCollapsed ? 'justify-center px-2' : ''}`}
              title={isCollapsed ? "Sign Out" : ""}
         >

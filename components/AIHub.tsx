@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { FunctionDeclaration, GoogleGenAI, Type } from "@google/genai";
 import { Send, Bot, Sparkles, Activity, TrendingUp, AlertCircle, Loader2, FileText, Lock, ExternalLink } from 'lucide-react';
-import { Bird, EggLogEntry, Transaction } from '../types';
+import { Bird, EggLogEntry, Transaction, ManualTask } from '../types';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 type Tab = 'chat' | 'health' | 'analysis';
 
@@ -15,9 +16,12 @@ export const AIHub: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('chat');
   
+  // Shared State via hook for tasks
+  const [tasks, setTasks] = usePersistentState<ManualTask[]>('poultry_tasks', []);
+
   // Chat State
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'model', text: 'Hello! I am your PoultryPro Farm Assistant. How can I help you with your flock today?' }
+    { id: '1', role: 'model', text: 'Hello! I am your PoultryPro Farm Assistant. I can help answer questions or manage your task list. How can I help?' }
   ]);
   const [input, setInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -75,6 +79,26 @@ export const AIHub: React.FC = () => {
       return "Unable to connect to AI service. Please try again later.";
   };
 
+  // Define Tools
+  const createTaskTool: FunctionDeclaration = {
+    name: 'createTask',
+    description: 'Create a new manual task or to-do item for the farm manager.',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            description: {
+                type: Type.STRING,
+                description: 'The content of the task (e.g., Buy feed, Fix fence).'
+            },
+            dueDate: {
+                type: Type.STRING,
+                description: 'The due date in YYYY-MM-DD format.'
+            }
+        },
+        required: ['description', 'dueDate']
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!input.trim()) return;
 
@@ -90,11 +114,56 @@ export const AIHub: React.FC = () => {
         contents: `You are an expert poultry farm consultant specializing in Rhode Island Reds and Black Australorps. 
         User Question: ${input}
         
-        Provide a concise, helpful answer suited for a farm manager.`,
+        If the user wants to add a task, use the createTask tool. Today is ${new Date().toISOString().split('T')[0]}.`,
+        config: {
+            tools: [{ functionDeclarations: [createTaskTool] }]
+        }
       });
 
-      const text = response.text || "I apologize, I couldn't generate a response at the moment.";
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text }]);
+      // Handle Function Calls
+      const functionCalls = response.candidates?.[0]?.content?.parts?.filter(p => p.functionCall)?.map(p => p.functionCall);
+      
+      if (functionCalls && functionCalls.length > 0) {
+          const call = functionCalls[0];
+          if (call && call.name === 'createTask') {
+              const args = call.args as any;
+              
+              // Perform the logic (save task)
+              const newTask: ManualTask = {
+                  id: `task-${Date.now()}`,
+                  description: args.description,
+                  dueDate: args.dueDate,
+                  completed: false,
+                  createdAt: new Date().toISOString()
+              };
+              
+              // We need to update local state. Since `tasks` comes from usePersistentState, 
+              // we can't update it inside this async function easily without causing closure staleness issues 
+              // if we use `setTasks` dependent on `tasks`.
+              // So we read from localStorage directly to be safe, then update.
+              const currentTasks = JSON.parse(localStorage.getItem('poultry_tasks') || '[]');
+              const updatedTasks = [newTask, ...currentTasks];
+              localStorage.setItem('poultry_tasks', JSON.stringify(updatedTasks));
+              setTasks(updatedTasks); // Update React state to reflect globally if needed
+
+              // Send response back to model
+              const toolResponse = await ai.models.generateContent({
+                  model: 'gemini-3-flash-preview',
+                  contents: [
+                      { role: 'user', parts: [{ text: input }] },
+                      { role: 'model', parts: [{ functionCall: call }] },
+                      { role: 'user', parts: [{ functionResponse: { name: 'createTask', response: { result: 'Task created successfully' } } }] }
+                  ]
+              });
+              
+               const text = toolResponse.text || "Task created.";
+               setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text }]);
+          }
+      } else {
+        const text = response.text || "I apologize, I couldn't generate a response at the moment.";
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text }]);
+      }
+
     } catch (error) {
       const errorText = handleAPIError(error);
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: errorText }]);
@@ -290,7 +359,7 @@ export const AIHub: React.FC = () => {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                            placeholder="Ask about feed, breeds, or coop maintenance..."
+                            placeholder="Ask questions or say 'Create a task to buy feed tomorrow'..."
                             className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                         <button 

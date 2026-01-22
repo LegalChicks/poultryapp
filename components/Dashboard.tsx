@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-import { Bird as BirdIcon, Egg, DollarSign, Activity, AlertCircle, Package } from 'lucide-react';
+import { Bird as BirdIcon, Egg, DollarSign, Activity, AlertCircle, Package, CheckSquare, Trash2, Check } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { MOCK_BIRDS, MOCK_EGG_LOG, MOCK_TRANSACTIONS, MOCK_INVENTORY, MOCK_INCUBATION } from '../constants';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TransactionType, Bird, EggLogEntry, Transaction, InventoryItem, IncubationBatch } from '../types';
+import { TransactionType, Bird, EggLogEntry, Transaction, InventoryItem, IncubationBatch, ManualTask } from '../types';
 import { usePersistentState } from '../hooks/usePersistentState';
 
 export const Dashboard: React.FC = () => {
@@ -13,6 +13,7 @@ export const Dashboard: React.FC = () => {
   const [transactions] = usePersistentState<Transaction[]>('poultry_finance', MOCK_TRANSACTIONS);
   const [inventory] = usePersistentState<InventoryItem[]>('poultry_inventory', MOCK_INVENTORY);
   const [incubations] = usePersistentState<IncubationBatch[]>('poultry_incubation', MOCK_INCUBATION);
+  const [manualTasks, setManualTasks] = usePersistentState<ManualTask[]>('poultry_tasks', []);
 
   // 1. Flock Stats
   const totalBirds = birds
@@ -75,6 +76,10 @@ export const Dashboard: React.FC = () => {
       const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
       return { ...batch, daysElapsed: diff };
   });
+
+  const completeTask = (taskId: string) => {
+      setManualTasks(manualTasks.filter(t => t.id !== taskId));
+  };
 
   return (
     <div className="space-y-6">
@@ -169,6 +174,23 @@ export const Dashboard: React.FC = () => {
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Pending Tasks</h2>
           <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px]">
             
+            {/* Manual Tasks from AI/User */}
+            {manualTasks.map(task => (
+                 <div key={task.id} className="flex items-start gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100 group">
+                    <button 
+                        onClick={() => completeTask(task.id)}
+                        className="mt-1 text-indigo-400 hover:text-green-600 transition-colors"
+                        title="Mark as Complete"
+                    >
+                        <CheckSquare size={18} />
+                    </button>
+                    <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-800">{task.description}</p>
+                        <p className="text-xs text-gray-500">Due: {new Date(task.dueDate).toLocaleDateString()}</p>
+                    </div>
+                 </div>
+            ))}
+
             {/* Inventory Alerts */}
             {lowStockItems.map(item => (
                 <div key={item.id} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
@@ -205,12 +227,12 @@ export const Dashboard: React.FC = () => {
             })}
 
             {/* Default Maintenance Tasks if list is empty or small */}
-            {lowStockItems.length === 0 && (
+            {lowStockItems.length === 0 && manualTasks.length === 0 && (
                 <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
                     <div className="w-2 h-2 mt-2 bg-green-500 rounded-full flex-shrink-0" />
                     <div>
-                        <p className="text-sm font-medium text-gray-800">Inventory Status</p>
-                        <p className="text-xs text-gray-500">All supplies are well stocked.</p>
+                        <p className="text-sm font-medium text-gray-800">Status Check</p>
+                        <p className="text-xs text-gray-500">No urgent alerts.</p>
                     </div>
                 </div>
             )}
