@@ -269,8 +269,8 @@ export const FlockManager: React.FC = () => {
           
           return (
             <div key={bird.id} 
-                onClick={() => isSelected ? toggleSelection(bird.id) : null}
-                className={`group bg-white p-6 rounded-4xl border shadow-premium flex flex-col gap-6 relative overflow-hidden hover:shadow-xl transition-all duration-300
+                onClick={(e) => selectedIds.size > 0 ? toggleSelection(bird.id, e) : undefined}
+                className={`group bg-white p-6 rounded-4xl border shadow-premium flex flex-col gap-6 relative overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer
                 ${isSelected ? 'ring-2 ring-emerald-500 border-emerald-500/20 bg-emerald-50/10' : 'border-slate-100'}`}
             >
                {/* Status Stripe */}
