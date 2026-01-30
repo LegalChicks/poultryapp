@@ -5,6 +5,15 @@ export enum Breed {
   Other = 'Other'
 }
 
+export interface BreedProfile {
+  id: string;
+  name: string; // Full name
+  code: string; // Short code e.g. RIR
+  gestationDays: number;
+  color: string; // For UI identification
+  isSystem?: boolean; // Prevent deletion of defaults
+}
+
 export enum BirdStage {
   Chick = 'Chick',
   Pullet = 'Pullet',
@@ -30,7 +39,7 @@ export interface Bird {
   tagNumber: string;
   name?: string;
   count: number;
-  breed: Breed;
+  breed: string; // Changed from Breed enum to string to support custom breeds
   stage: BirdStage;
   hatchDate: string;
   notes?: string;
@@ -44,7 +53,7 @@ export interface EggLogEntry {
   count: number;
   damaged: number;
   notes?: string;
-  breed?: Breed | 'Mixed';
+  breed?: string | 'Mixed'; // Changed from Breed enum
 }
 
 export interface IncubationBatch {
@@ -52,7 +61,7 @@ export interface IncubationBatch {
   startDate: string;
   projectedHatchDate: string;
   eggCount: number;
-  breed: Breed;
+  breed: string; // Changed from Breed enum
   fertileCount?: number;
   hatchedCount?: number;
   status: 'Incubating' | 'Hatched' | 'Failed';
@@ -76,6 +85,10 @@ export interface InventoryItem {
   restockThreshold: number;
   lastUpdated?: string;
   notes?: string;
+  // Auto-consumption settings
+  isAutoFeed?: boolean;
+  dailyRatePerBird?: number;
+  lastAutoDeductDate?: string;
 }
 
 export interface HealthRecord {
@@ -83,7 +96,7 @@ export interface HealthRecord {
   date: string;
   type: HealthEventType;
   subject: string; // e.g., "All Flock", "RIR-001", "Black Australorps"
-  breed?: Breed;
+  breed?: string; // Changed from Breed enum
   description: string;
   treatment?: string;
   outcome?: 'Recovered' | 'Ongoing' | 'Deceased' | 'N/A';

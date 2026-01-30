@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Bird as BirdIcon, Egg, DollarSign, Activity, AlertCircle, Package, CheckSquare, Trash2, Check } from 'lucide-react';
+import { Bird as BirdIcon, Egg, DollarSign, Activity, CheckSquare, ArrowRight, Bell } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { MOCK_BIRDS, MOCK_EGG_LOG, MOCK_TRANSACTIONS, MOCK_INVENTORY, MOCK_INCUBATION } from '../constants';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -7,7 +7,7 @@ import { TransactionType, Bird, EggLogEntry, Transaction, InventoryItem, Incubat
 import { usePersistentState } from '../hooks/usePersistentState';
 
 export const Dashboard: React.FC = () => {
-  // Load persistent data using the same keys as the managers
+  // Load persistent data
   const [birds] = usePersistentState<Bird[]>('poultry_birds', MOCK_BIRDS);
   const [eggLogs] = usePersistentState<EggLogEntry[]>('poultry_eggs', MOCK_EGG_LOG);
   const [transactions] = usePersistentState<Transaction[]>('poultry_finance', MOCK_TRANSACTIONS);
@@ -26,7 +26,6 @@ export const Dashboard: React.FC = () => {
 
   // 2. Egg Stats
   const today = new Date().toISOString().split('T')[0];
-  // Sum all logs for today, as there might be separate logs for different breeds
   const todaysEggs = eggLogs
     .filter(l => l.date === today)
     .reduce((acc, curr) => acc + curr.count, 0);
@@ -43,7 +42,6 @@ export const Dashboard: React.FC = () => {
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   // 4. Incubation Stats
-  // Find the most recent finished batch
   const recentHatch = [...incubations]
       .filter(i => i.status === 'Hatched' || i.status === 'Failed')
       .sort((a,b) => new Date(b.projectedHatchDate).getTime() - new Date(a.projectedHatchDate).getTime())[0];
@@ -52,15 +50,13 @@ export const Dashboard: React.FC = () => {
     ? Math.round(((recentHatch.hatchedCount || 0) / recentHatch.fertileCount) * 100) 
     : 0;
 
-  // 5. Chart Data (Last 14 days, aggregated)
+  // 5. Chart Data
   const chartData = useMemo(() => {
-    // Group by date first
     const grouped = eggLogs.reduce((acc, log) => {
         acc[log.date] = (acc[log.date] || 0) + log.count;
         return acc;
     }, {} as Record<string, number>);
 
-    // Convert to array and sort
     return Object.entries(grouped)
         .map(([date, count]) => ({ date, count }))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -82,27 +78,33 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Farm Overview</h1>
-          <p className="text-gray-500">Welcome back to PoultryPro.</p>
+          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Farm Command</h1>
+          <p className="text-slate-500 font-medium mt-1">Efficiently managing your Rhode Island Reds & Australorps.</p>
         </div>
-        <button 
-            onClick={() => window.location.hash = '#/eggs'}
-            className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          + Quick Log Eggs
-        </button>
+        <div className="flex gap-3 w-full lg:w-auto">
+          <button 
+              onClick={() => window.location.hash = '#/eggs'}
+              className="flex-1 lg:flex-none gradient-primary hover:opacity-90 text-white px-6 py-4 rounded-2xl text-sm font-bold transition-all shadow-xl shadow-emerald-900/10 flex justify-center items-center gap-2"
+          >
+            <Egg size={18} />
+            Log Daily Collection
+          </button>
+          <button className="p-4 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-slate-600 transition-colors shadow-sm">
+            <Bell size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Total Flock" 
           value={totalBirds} 
           icon={BirdIcon} 
-          trend={`${activeHens} Active Hens`}
+          trend={`${activeHens} Productive Hens`}
           trendUp={true}
           color="amber"
         />
@@ -115,137 +117,125 @@ export const Dashboard: React.FC = () => {
           color="yellow"
         />
         <StatCard 
-          title="Monthly Income" 
+          title="Revenue (Mo)" 
           value={`$${monthlyIncome.toFixed(0)}`} 
           icon={DollarSign} 
-          trend="Current Month"
+          trend="Stable"
           trendUp={true}
           color="green"
         />
         <StatCard 
-          title="Avg Hatch Rate" 
+          title="Hatch Success" 
           value={recentHatch ? `${hatchRate}%` : "N/A"} 
           icon={Activity} 
-          trend={recentHatch ? "Last batch" : "No recent data"}
+          trend="Last Batch"
           trendUp={hatchRate > 80}
           color="blue"
         />
       </div>
 
-      {/* Main Content Split */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Chart Section */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Egg Production Trend (Last 14 Days)</h2>
+        <div className="lg:col-span-2 bg-white p-8 rounded-4xl shadow-premium border border-slate-100">
+          <div className="flex justify-between items-center mb-8">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Production Trends</h2>
+                <p className="text-sm font-medium text-slate-400 mt-0.5">Laying rate over past 14 days</p>
+              </div>
+              <div className="flex gap-2">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1 bg-slate-50 rounded-full border border-slate-100">Live View</span>
+              </div>
+          </div>
           {chartData.length > 0 ? (
-            <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                    <defs>
-                    <linearGradient id="colorEggs" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#d97706" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#d97706" stopOpacity={0}/>
-                    </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis 
-                    dataKey="date" 
-                    tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
-                    stroke="#9ca3af"
-                    fontSize={12}
-                    />
-                    <YAxis stroke="#9ca3af" fontSize={12} />
-                    <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                    />
-                    <Area type="monotone" dataKey="count" stroke="#d97706" strokeWidth={2} fillOpacity={1} fill="url(#colorEggs)" />
-                </AreaChart>
-                </ResponsiveContainer>
-            </div>
+          <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                  <defs>
+                  <linearGradient id="colorEggs" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {day:'numeric'})}
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  fontWeight={600}
+                  dy={10}
+                  />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={30} fontWeight={600} />
+                  <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', borderRadius: '12px', border: 'none', fontSize: '12px', color: '#fff', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  itemStyle={{ color: '#fff', fontWeight: 600 }}
+                  cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                  />
+                  <Area type="monotone" dataKey="count" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorEggs)" />
+              </AreaChart>
+              </ResponsiveContainer>
+          </div>
           ) : (
-             <div className="h-80 w-full flex items-center justify-center text-gray-400 border border-dashed rounded-lg bg-gray-50">
-                <p>No egg data available yet</p>
-             </div>
+              <div className="h-72 w-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50/50">
+                <Egg size={48} className="mb-4 opacity-20" />
+                <p className="font-semibold">No collection data recorded</p>
+              </div>
           )}
         </div>
 
-        {/* Quick Alerts/Tasks */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Pending Tasks</h2>
-          <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px]">
+        {/* Action Center */}
+        <div className="bg-slate-900 p-8 rounded-4xl shadow-xl border border-slate-800 flex flex-col">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <Bell size={20} className="text-amber-500" />
+              Action Required
+            </h2>
             
-            {/* Manual Tasks from AI/User */}
-            {manualTasks.map(task => (
-                 <div key={task.id} className="flex items-start gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100 group">
-                    <button 
-                        onClick={() => completeTask(task.id)}
-                        className="mt-1 text-indigo-400 hover:text-green-600 transition-colors"
-                        title="Mark as Complete"
-                    >
-                        <CheckSquare size={18} />
-                    </button>
-                    <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">{task.description}</p>
-                        <p className="text-xs text-gray-500">Due: {new Date(task.dueDate).toLocaleDateString()}</p>
-                    </div>
-                 </div>
-            ))}
+            <div className="flex-1 space-y-4">
+              {/* Manual Tasks */}
+              {manualTasks.length > 0 ? manualTasks.map(task => (
+                  <div key={task.id} className="group flex items-start gap-4 p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/5">
+                      <button 
+                          onClick={() => completeTask(task.id)}
+                          className="mt-1 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-transparent group-hover:border-amber-500 group-hover:text-amber-500 transition-all"
+                      >
+                          <CheckSquare size={14} />
+                      </button>
+                      <div className="flex-1">
+                          <p className="text-sm font-bold text-slate-200 leading-snug">{task.description}</p>
+                          <p className="text-[10px] font-bold text-amber-500 mt-1 uppercase tracking-widest">Due: {new Date(task.dueDate).toLocaleDateString()}</p>
+                      </div>
+                  </div>
+              )) : null}
 
-            {/* Inventory Alerts */}
-            {lowStockItems.map(item => (
-                <div key={item.id} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                    <div className="w-2 h-2 mt-2 bg-red-500 rounded-full flex-shrink-0" />
-                    <div>
-                        <p className="text-sm font-medium text-gray-800">Restock {item.name}</p>
-                        <p className="text-xs text-gray-500">Only {item.quantity} {item.unit} remaining (Threshold: {item.restockThreshold})</p>
-                    </div>
-                </div>
-            ))}
+              {/* Inventory Alerts */}
+              {lowStockItems.map(item => (
+                  <div key={item.id} className="flex items-start gap-4 p-4 bg-rose-500/10 rounded-2xl border border-rose-500/20">
+                      <div className="mt-1 w-6 h-6 flex items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold">!</div>
+                      <div>
+                          <p className="text-sm font-bold text-slate-100">Restock {item.name}</p>
+                          <p className="text-[10px] font-bold text-rose-400 mt-1 uppercase">Only {item.quantity} {item.unit} remaining</p>
+                      </div>
+                  </div>
+              ))}
 
-            {/* Incubation Alerts */}
-            {activeIncubations.map(batch => {
-                let action = '';
-                const d = batch.daysElapsed;
-                // Simple logic for key incubation events
-                if (d >= 7 && d <= 8) action = 'Candling (Day 7)';
-                else if (d >= 14 && d <= 15) action = 'Candling (Day 14)';
-                else if (d >= 18 && d < 21) action = 'Stop Turning (Lockdown)';
-                else if (d >= 21) action = 'Hatching Expected';
-                
-                if (action) {
-                    return (
-                        <div key={batch.id} className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
-                            <div className="w-2 h-2 mt-2 bg-amber-500 rounded-full flex-shrink-0" />
-                            <div>
-                                <p className="text-sm font-medium text-gray-800">Incubation Batch {batch.breed}</p>
-                                <p className="text-xs text-gray-500">Day {d}: {action}</p>
-                            </div>
-                        </div>
-                    );
-                }
-                return null;
-            })}
-
-            {/* Default Maintenance Tasks if list is empty or small */}
-            {lowStockItems.length === 0 && manualTasks.length === 0 && (
-                <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
-                    <div className="w-2 h-2 mt-2 bg-green-500 rounded-full flex-shrink-0" />
-                    <div>
-                        <p className="text-sm font-medium text-gray-800">Status Check</p>
-                        <p className="text-xs text-gray-500">No urgent alerts.</p>
-                    </div>
-                </div>
-            )}
-            
-             <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-               <div className="w-2 h-2 mt-2 bg-blue-500 rounded-full flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-gray-800">Coop Maintenance</p>
-                <p className="text-xs text-gray-500">Weekly cleaning check recommended.</p>
-              </div>
+              {/* Empty State */}
+              {lowStockItems.length === 0 && manualTasks.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                      <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-500 mb-4">
+                        <CheckSquare size={32} />
+                      </div>
+                      <p className="text-slate-300 font-bold">All tasks cleared</p>
+                      <p className="text-slate-500 text-xs mt-1">Great job managing the flock!</p>
+                  </div>
+              )}
             </div>
-
-          </div>
+            
+            <button className="mt-6 w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-black text-slate-400 uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+               View All Records
+               <ArrowRight size={14} />
+            </button>
         </div>
       </div>
     </div>

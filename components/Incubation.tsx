@@ -1,34 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { MOCK_INCUBATION } from '../constants';
+import { MOCK_INCUBATION, DEFAULT_BREED_PROFILES } from '../constants';
 import { IncubationGauge } from './IncubationGauge';
 import { Calendar, Thermometer, Plus, Trash2, X } from 'lucide-react';
 import { usePersistentState } from '../hooks/usePersistentState';
-import { IncubationBatch, Breed } from '../types';
-
-// Gestation map in days
-const GESTATION_DAYS: Record<string, number> = {
-    [Breed.RIR]: 21,
-    [Breed.BA]: 21,
-    [Breed.Other]: 21, 
-};
+import { IncubationBatch, BreedProfile } from '../types';
 
 export const Incubation: React.FC = () => {
   const [batches, setBatches] = usePersistentState<IncubationBatch[]>('poultry_incubation', MOCK_INCUBATION);
+  const [breeds] = usePersistentState<BreedProfile[]>('poultry_breeds', DEFAULT_BREED_PROFILES);
+  
   const [showModal, setShowModal] = useState(false);
   const [newBatch, setNewBatch] = useState<Partial<IncubationBatch>>({
       startDate: new Date().toISOString().split('T')[0],
       eggCount: 0,
-      breed: Breed.RIR,
+      breed: breeds[0]?.name || 'Rhode Island Red',
       status: 'Incubating'
   });
 
-  // Calculate projected hatch date whenever start date or breed changes in the form
-  useEffect(() => {
-    if (showModal && newBatch.startDate && newBatch.breed) {
-        // Just for display or internal logic if needed, but the actual calculation happens on Save usually.
-        // However, user might want to see the projected date. Let's add that to the UI.
-    }
-  }, [newBatch.startDate, newBatch.breed, showModal]);
+  const getGestation = (breedName: string) => breeds.find(b => b.name === breedName)?.gestationDays || 21;
 
   const calculateDaysElapsed = (startDate: string) => {
     const start = new Date(startDate);
@@ -37,8 +26,8 @@ export const Incubation: React.FC = () => {
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   };
 
-  const getProjectedDate = (startStr: string, breed: Breed) => {
-      const days = GESTATION_DAYS[breed] || 21;
+  const getProjectedDate = (startStr: string, breedName: string) => {
+      const days = getGestation(breedName);
       const start = new Date(startStr);
       const hatch = new Date(start);
       hatch.setDate(start.getDate() + days);
@@ -52,9 +41,9 @@ export const Incubation: React.FC = () => {
   };
 
   const handleStartBatch = () => {
-      if(!newBatch.eggCount) return;
+      if(!newBatch.eggCount || !newBatch.breed) return;
       
-      const days = GESTATION_DAYS[newBatch.breed as Breed] || 21;
+      const days = getGestation(newBatch.breed);
       const start = new Date(newBatch.startDate!);
       const hatch = new Date(start);
       hatch.setDate(start.getDate() + days);
@@ -64,7 +53,7 @@ export const Incubation: React.FC = () => {
           startDate: newBatch.startDate!,
           projectedHatchDate: hatch.toISOString().split('T')[0],
           eggCount: Number(newBatch.eggCount),
-          breed: newBatch.breed as Breed,
+          breed: newBatch.breed,
           status: 'Incubating'
       };
       
@@ -88,7 +77,7 @@ export const Incubation: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {batches.map((batch) => {
             const elapsed = calculateDaysElapsed(batch.startDate);
-            const total = GESTATION_DAYS[batch.breed] || 21; 
+            const total = getGestation(batch.breed); 
             const isFinished = batch.status !== 'Incubating';
             
             return (
@@ -163,10 +152,10 @@ export const Incubation: React.FC = () => {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Breed</label>
-                        <select value={newBatch.breed} onChange={e => setNewBatch({...newBatch, breed: e.target.value as Breed})} className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500">
-                            {Object.values(Breed).map(b => <option key={b} value={b}>{b}</option>)}
+                        <select value={newBatch.breed} onChange={e => setNewBatch({...newBatch, breed: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500">
+                            {breeds.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                         </select>
-                        <p className="text-xs text-gray-400 mt-1">Gestation: {GESTATION_DAYS[newBatch.breed as string] || 21} Days</p>
+                        <p className="text-xs text-gray-400 mt-1">Gestation: {getGestation(newBatch.breed || '')} Days</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Egg Count</label>
@@ -178,7 +167,7 @@ export const Incubation: React.FC = () => {
                              <span className="text-blue-800">Projected Hatch:</span>
                              <span className="font-bold text-blue-900">
                                  {newBatch.startDate && newBatch.breed ? 
-                                    new Date(getProjectedDate(newBatch.startDate, newBatch.breed as Breed)).toLocaleDateString() 
+                                    new Date(getProjectedDate(newBatch.startDate, newBatch.breed)).toLocaleDateString() 
                                     : '-'}
                              </span>
                         </div>

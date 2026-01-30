@@ -10,83 +10,91 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar, onLogout }) => {
   const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/ai-tools', icon: Sparkles, label: 'AI Assistant' },
-    { to: '/flock', icon: Bird, label: 'Flock' },
+    { to: '/', icon: LayoutDashboard, label: 'Command Center' },
+    { to: '/ai-tools', icon: Sparkles, label: 'Gemini AI Assistant', isAI: true },
+    { to: '/flock', icon: Bird, label: 'Flock Manager' },
     { to: '/health', icon: Stethoscope, label: 'Health Records' },
-    { to: '/eggs', icon: Egg, label: 'Egg Logs' },
-    { to: '/incubation', icon: Thermometer, label: 'Incubation' },
-    { to: '/finance', icon: DollarSign, label: 'Finance' },
-    { to: '/inventory', icon: Package, label: 'Inventory' },
+    { to: '/eggs', icon: Egg, label: 'Egg Collection' },
+    { to: '/incubation', icon: Thermometer, label: 'Incubation Lab' },
+    { to: '/finance', icon: DollarSign, label: 'Financial Hub' },
+    { to: '/inventory', icon: Package, label: 'Supplies & Inventory' },
   ];
 
   return (
-    <aside className={`h-screen bg-gray-900 text-white fixed left-0 top-0 flex flex-col border-r border-gray-800 transition-all duration-300 z-20 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-      <div className={`p-6 border-b border-gray-800 flex items-center justify-between relative`}>
-        <div className={`flex items-center gap-3 overflow-hidden ${isCollapsed ? 'justify-center w-full' : ''}`}>
-          <div className="w-10 h-10 bg-amber-600 rounded-lg flex-shrink-0 flex items-center justify-center">
-            <Bird size={24} className="text-white" />
-          </div>
-          <div className={`transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
-            <h1 className="font-bold text-lg leading-tight whitespace-nowrap">PoultryPro</h1>
-            <p className="text-xs text-gray-400 whitespace-nowrap">Farm Manager</p>
-          </div>
+    <aside className={`h-screen bg-[#020617] text-white fixed left-0 top-0 flex flex-col border-r border-slate-800 transition-all duration-300 z-30 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+      {/* Brand Header */}
+      <div className={`p-6 border-b border-slate-800 flex items-center gap-3 relative overflow-hidden`}>
+        <div className="w-10 h-10 gradient-accent rounded-xl flex-shrink-0 flex items-center justify-center shadow-lg shadow-amber-900/20">
+          <Bird size={24} className="text-white" />
         </div>
+        <div className={`transition-all duration-300 ${isCollapsed ? 'opacity-0 scale-90 translate-x-10 hidden' : 'opacity-100 scale-100 translate-x-0'}`}>
+          <h1 className="font-extrabold text-xl leading-none tracking-tight">PoultryPro</h1>
+          <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-1">Systems v1.5</p>
+        </div>
+        
+        {/* Shimmer effect for brand */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_3s_infinite]" style={{ animationDuration: '4s' }}></div>
       </div>
 
-       {/* Toggle Button */}
+       {/* Collapse Toggle */}
       <button 
         onClick={toggleSidebar}
-        className="absolute -right-3 top-9 bg-gray-800 text-gray-400 hover:text-white border border-gray-700 rounded-full p-1 shadow-md transition-colors z-50 focus:outline-none"
-        title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        className="absolute -right-3 top-8 bg-slate-800 text-slate-400 hover:text-white border border-slate-700 rounded-full p-1 shadow-xl transition-colors z-50 focus:outline-none"
       >
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden">
+      {/* Main Navigation */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto mt-2">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors font-medium text-sm whitespace-nowrap
+              `group relative flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all font-semibold text-sm whitespace-nowrap
               ${isActive 
-                ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20' 
-                : 'text-gray-400 hover:bg-gray-800 hover:text-white'}
+                ? 'bg-amber-500/10 text-amber-500 shadow-inner-soft' 
+                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}
               ${isCollapsed ? 'justify-center px-2' : ''}`
             }
-            title={isCollapsed ? item.label : ''}
           >
-            <item.icon size={20} className="flex-shrink-0" />
-            <span className={`transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
-              {item.label}
-            </span>
+            {({ isActive }) => (
+              <>
+                <item.icon size={20} className={`flex-shrink-0 ${item.isAI && !isActive ? 'text-indigo-400' : ''}`} />
+                <span className={`transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 pointer-events-none' : 'opacity-100'}`}>
+                  {item.label}
+                </span>
+                {isActive && !isCollapsed && (
+                  <div className="absolute left-0 top-1/4 h-1/2 w-1 bg-amber-500 rounded-r-full shadow-lg shadow-amber-500/50"></div>
+                )}
+                {item.isAI && !isCollapsed && (
+                   <span className="ml-auto text-[8px] font-black bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded uppercase tracking-widest border border-indigo-500/20 group-hover:bg-indigo-500 group-hover:text-white transition-all">Beta</span>
+                )}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
 
-      <div className="p-4 border-t border-gray-800 space-y-1 overflow-x-hidden">
+      {/* Bottom Actions */}
+      <div className="p-4 border-t border-slate-800 space-y-1">
         <NavLink 
           to="/settings"
           className={({ isActive }) =>
-              `flex w-full items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm font-medium whitespace-nowrap
-              ${isActive 
-                ? 'text-white bg-gray-800' 
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'}
+              `flex w-full items-center gap-3 px-4 py-3.5 rounded-2xl transition-all text-sm font-semibold whitespace-nowrap
+              ${isActive ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}
                ${isCollapsed ? 'justify-center px-2' : ''}`
           }
-           title={isCollapsed ? "Settings" : ""}
         >
           <Settings size={20} className="flex-shrink-0" />
-          <span className={`transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>Settings</span>
+          <span className={`transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 pointer-events-none' : 'opacity-100'}`}>System Settings</span>
         </NavLink>
         <button 
             onClick={onLogout}
-            className={`flex w-full items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors text-sm font-medium whitespace-nowrap ${isCollapsed ? 'justify-center px-2' : ''}`}
-             title={isCollapsed ? "Sign Out" : ""}
+            className={`flex w-full items-center gap-3 px-4 py-3.5 text-rose-400 hover:bg-rose-500/10 rounded-2xl transition-all text-sm font-semibold whitespace-nowrap ${isCollapsed ? 'justify-center px-2' : ''}`}
         >
           <LogOut size={20} className="flex-shrink-0" />
-          <span className={`transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>Sign Out</span>
+          <span className={`transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 pointer-events-none' : 'opacity-100'}`}>Terminate Session</span>
         </button>
       </div>
     </aside>

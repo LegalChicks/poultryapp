@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { Save, Trash2, Database, AlertTriangle, CheckCircle, RefreshCw, Power, X, Shield, Smartphone, Globe, Monitor } from 'lucide-react';
-import { LoginLog } from '../types';
+import { Save, Trash2, Database, AlertTriangle, CheckCircle, RefreshCw, Power, X, Shield, Smartphone, Globe, Monitor, Bird, Plus } from 'lucide-react';
+import { LoginLog, BreedProfile } from '../types';
+import { usePersistentState } from '../hooks/usePersistentState';
+import { DEFAULT_BREED_PROFILES } from '../constants';
 
 export const Settings: React.FC = () => {
   const [farmName, setFarmName] = useState(() => localStorage.getItem('poultry_farm_name') || 'PoultryPro Farm');
   const [currency, setCurrency] = useState(() => localStorage.getItem('poultry_currency') || '$');
   const [showSuccess, setShowSuccess] = useState(false);
+  
+  // Custom Breed State
+  const [breeds, setBreeds] = usePersistentState<BreedProfile[]>('poultry_breeds', DEFAULT_BREED_PROFILES);
+  const [newBreed, setNewBreed] = useState<Partial<BreedProfile>>({ name: '', code: '', gestationDays: 21, color: 'blue' });
   
   // Modal state for dangerous actions
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -23,6 +29,27 @@ export const Settings: React.FC = () => {
     window.location.reload(); 
   };
 
+  const handleAddBreed = () => {
+      if (newBreed.name && newBreed.code && newBreed.gestationDays) {
+          const profile: BreedProfile = {
+              id: `bp-${Date.now()}`,
+              name: newBreed.name,
+              code: newBreed.code.toUpperCase(),
+              gestationDays: Number(newBreed.gestationDays),
+              color: newBreed.color || 'blue',
+              isSystem: false
+          };
+          setBreeds([...breeds, profile]);
+          setNewBreed({ name: '', code: '', gestationDays: 21, color: 'blue' });
+      }
+  };
+
+  const handleDeleteBreed = (id: string) => {
+      if (confirm('Remove this breed profile? Existing birds will retain their breed name but the profile will be lost.')) {
+          setBreeds(breeds.filter(b => b.id !== id));
+      }
+  };
+
   const executeStartFresh = () => {
     if (deleteConfirmation === 'DELETE') {
        const keysToReset = [
@@ -33,7 +60,8 @@ export const Settings: React.FC = () => {
          'poultry_incubation',
          'poultry_finance',
          'poultry_tasks',
-         'poultry_login_logs'
+         'poultry_login_logs',
+         'poultry_breeds'
        ];
        
        keysToReset.forEach(key => localStorage.setItem(key, '[]'));
@@ -50,7 +78,8 @@ export const Settings: React.FC = () => {
             'poultry_inventory',
             'poultry_incubation',
             'poultry_finance',
-            'poultry_tasks'
+            'poultry_tasks',
+            'poultry_breeds'
         ];
         keysToReset.forEach(key => localStorage.removeItem(key));
         window.location.reload();
@@ -77,8 +106,17 @@ export const Settings: React.FC = () => {
     return `${browser} on ${os}`;
   };
 
+  const colorOptions = [
+      { name: 'Red', val: 'red' },
+      { name: 'Blue', val: 'blue' },
+      { name: 'Green', val: 'emerald' },
+      { name: 'Amber', val: 'amber' },
+      { name: 'Slate', val: 'slate' },
+      { name: 'Purple', val: 'purple' },
+  ];
+
   return (
-    <div className="space-y-8 max-w-4xl relative">
+    <div className="space-y-8 max-w-4xl relative pb-10">
       <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
 
       {/* General Settings */}
@@ -115,6 +153,86 @@ export const Settings: React.FC = () => {
                 {showSuccess ? 'Saved!' : 'Save Changes'}
             </button>
         </div>
+      </div>
+
+      {/* Breed Management */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+             <Bird size={20} className="text-gray-400" />
+             Breed Profiles
+          </h2>
+          <p className="text-sm text-gray-500 mb-6">Manage custom breeds and their specific gestation periods for incubation tracking.</p>
+
+          <div className="space-y-3 mb-8">
+              {breeds.map(breed => (
+                  <div key={breed.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white bg-${breed.color}-500`}>
+                              {breed.code}
+                          </div>
+                          <div>
+                              <p className="font-bold text-sm text-gray-900">{breed.name}</p>
+                              <p className="text-xs text-gray-500">{breed.gestationDays} days gestation</p>
+                          </div>
+                      </div>
+                      {!breed.isSystem && (
+                          <button onClick={() => handleDeleteBreed(breed.id)} className="text-gray-400 hover:text-red-500 p-2">
+                              <Trash2 size={16} />
+                          </button>
+                      )}
+                      {breed.isSystem && <span className="text-[10px] font-bold text-gray-300 uppercase px-2">Default</span>}
+                  </div>
+              ))}
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Add Custom Breed</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <input 
+                      type="text" 
+                      placeholder="Breed Name (e.g. Leghorn)" 
+                      value={newBreed.name}
+                      onChange={e => setNewBreed({...newBreed, name: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-amber-500 col-span-2"
+                  />
+                  <input 
+                      type="text" 
+                      placeholder="Code (e.g. LEG)" 
+                      maxLength={4}
+                      value={newBreed.code}
+                      onChange={e => setNewBreed({...newBreed, code: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-amber-500"
+                  />
+                  <div className="relative">
+                     <input 
+                      type="number" 
+                      placeholder="Gestation (Days)" 
+                      value={newBreed.gestationDays}
+                      onChange={e => setNewBreed({...newBreed, gestationDays: parseInt(e.target.value)})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-amber-500"
+                    />
+                  </div>
+                   <div className="col-span-2 md:col-span-4 flex gap-2 overflow-x-auto py-2">
+                      {colorOptions.map(c => (
+                          <button 
+                            key={c.val}
+                            onClick={() => setNewBreed({...newBreed, color: c.val})}
+                            className={`px-3 py-1 rounded-full text-xs font-bold border transition-all
+                            ${newBreed.color === c.val ? `bg-${c.val}-100 text-${c.val}-700 border-${c.val}-300` : 'bg-white text-gray-500 border-gray-200'}`}
+                          >
+                              {c.name}
+                          </button>
+                      ))}
+                   </div>
+                  <button 
+                      onClick={handleAddBreed}
+                      disabled={!newBreed.name || !newBreed.code}
+                      className="col-span-2 md:col-span-4 bg-black text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                      <Plus size={16} /> Add Profile
+                  </button>
+              </div>
+          </div>
       </div>
 
       {/* Login Logs */}
@@ -202,7 +320,7 @@ export const Settings: React.FC = () => {
       </div>
       
       <div className="text-center text-xs text-gray-400 mt-8">
-          PoultryPro Manager v1.4.1 • Local Storage Persistence Enabled
+          PoultryPro Manager v1.5 • Local Storage Persistence Enabled
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -233,6 +351,7 @@ export const Settings: React.FC = () => {
                             <li>Financial Transactions</li>
                             <li>Pending Tasks</li>
                             <li>Security Logs</li>
+                            <li>Custom Breeds</li>
                         </ul>
                         Your <strong>Farm Name</strong> and <strong>Currency</strong> settings will be preserved.
                         <br/><br/>

@@ -1,15 +1,21 @@
-import { Bird, BirdStage, Breed, EggLogEntry, HealthEventType, HealthRecord, IncubationBatch, InventoryItem, Transaction, TransactionType } from './types';
+import { Bird, BirdStage, Breed, EggLogEntry, HealthEventType, HealthRecord, IncubationBatch, InventoryItem, Transaction, TransactionType, BreedProfile } from './types';
 
 // Using picsum to simulate the user's specific bird types in the UI placeholders
 export const RIR_IMAGE = "https://picsum.photos/id/1025/400/300"; // Placeholder for RIR
 export const BA_IMAGE = "https://picsum.photos/id/237/400/300"; // Placeholder for Australorp (using generic animal placeholder)
+
+export const DEFAULT_BREED_PROFILES: BreedProfile[] = [
+  { id: 'bp-1', name: 'Rhode Island Red', code: 'RIR', gestationDays: 21, color: 'red', isSystem: true },
+  { id: 'bp-2', name: 'Black Australorp', code: 'BA', gestationDays: 21, color: 'slate', isSystem: true },
+  { id: 'bp-3', name: 'Other / Mixed', code: 'Mix', gestationDays: 21, color: 'gray', isSystem: true }
+];
 
 export const MOCK_BIRDS: Bird[] = [
   {
     id: '1',
     tagNumber: 'RIR-001',
     count: 1,
-    breed: Breed.RIR,
+    breed: 'Rhode Island Red',
     stage: BirdStage.Hen,
     hatchDate: '2023-01-15',
     status: 'Active',
@@ -19,7 +25,7 @@ export const MOCK_BIRDS: Bird[] = [
     id: '2',
     tagNumber: 'BA-001',
     count: 1,
-    breed: Breed.BA,
+    breed: 'Black Australorp',
     stage: BirdStage.Hen,
     hatchDate: '2023-02-10',
     status: 'Active',
@@ -29,7 +35,7 @@ export const MOCK_BIRDS: Bird[] = [
     id: '3',
     tagNumber: 'RIR-002',
     count: 1,
-    breed: Breed.RIR,
+    breed: 'Rhode Island Red',
     stage: BirdStage.Rooster,
     hatchDate: '2023-01-15',
     status: 'Active'
@@ -39,7 +45,7 @@ export const MOCK_BIRDS: Bird[] = [
     tagNumber: 'Batch-A24',
     name: 'Spring Chicks',
     count: 15,
-    breed: Breed.BA,
+    breed: 'Black Australorp',
     stage: BirdStage.Chick,
     hatchDate: '2024-04-20',
     status: 'Active'
@@ -48,7 +54,7 @@ export const MOCK_BIRDS: Bird[] = [
     id: '5',
     tagNumber: 'BA-003',
     count: 1,
-    breed: Breed.BA,
+    breed: 'Black Australorp',
     stage: BirdStage.Chick,
     hatchDate: '2024-04-20',
     status: 'Active'
@@ -72,7 +78,7 @@ export const MOCK_INCUBATION: IncubationBatch[] = [
     startDate: new Date(new Date().setDate(new Date().getDate() - 10)).toISOString().split('T')[0], // Started 10 days ago
     projectedHatchDate: new Date(new Date().setDate(new Date().getDate() + 11)).toISOString().split('T')[0],
     eggCount: 24,
-    breed: Breed.RIR,
+    breed: 'Rhode Island Red',
     status: 'Incubating'
   },
   {
@@ -80,7 +86,7 @@ export const MOCK_INCUBATION: IncubationBatch[] = [
     startDate: '2024-03-01',
     projectedHatchDate: '2024-03-22',
     eggCount: 12,
-    breed: Breed.BA,
+    breed: 'Black Australorp',
     fertileCount: 11,
     hatchedCount: 10,
     status: 'Hatched'
@@ -107,7 +113,7 @@ export const MOCK_HEALTH_RECORDS: HealthRecord[] = [
     date: '2024-02-15', 
     type: HealthEventType.Vaccination, 
     subject: 'All Chicks', 
-    breed: Breed.RIR,
+    breed: 'Rhode Island Red',
     description: 'Mareks Vaccination for new hatchlings', 
     treatment: 'Injection', 
     outcome: 'N/A', 
@@ -118,7 +124,7 @@ export const MOCK_HEALTH_RECORDS: HealthRecord[] = [
     date: '2024-04-10', 
     type: HealthEventType.Injury, 
     subject: 'BA-001', 
-    breed: Breed.BA,
+    breed: 'Black Australorp',
     description: 'Minor leg injury from fence', 
     treatment: 'Cleaned and separated', 
     outcome: 'Recovered',
