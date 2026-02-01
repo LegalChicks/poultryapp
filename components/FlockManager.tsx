@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { MOCK_BIRDS, DEFAULT_BREED_PROFILES } from '../constants';
-import { Bird, BirdStage, BreedProfile } from '../types';
-import { Search, Filter, Plus, X, Save, Edit2, Calendar, Trash2, CheckSquare, Square, Layers, Check } from 'lucide-react';
+import { MOCK_BIRDS, DEFAULT_BREED_PROFILES, MOCK_INVENTORY } from '../constants';
+import { Bird, BirdStage, BreedProfile, InventoryItem } from '../types';
+import { Search, Filter, Plus, X, Save, Edit2, Calendar, Trash2, CheckSquare, Square, Layers, Utensils, AlertTriangle, ArrowRight } from 'lucide-react';
 import { usePersistentState } from '../hooks/usePersistentState';
 
 export const FlockManager: React.FC = () => {
   const [birds, setBirds] = usePersistentState<Bird[]>('poultry_birds', MOCK_BIRDS);
   const [breeds] = usePersistentState<BreedProfile[]>('poultry_breeds', DEFAULT_BREED_PROFILES);
+  const [inventory] = usePersistentState<InventoryItem[]>('poultry_inventory', MOCK_INVENTORY);
   
   const [filterBreed, setFilterBreed] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -36,10 +37,24 @@ export const FlockManager: React.FC = () => {
     stage: BirdStage.Chick,
     status: 'Active',
     hatchDate: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
+    feedInventoryId: ''
   });
 
   const getBreedProfile = (breedName: string) => breeds.find(b => b.name === breedName) || breeds[0];
+
+  const getFeedItems = () => inventory.filter(i => i.category === 'Feed');
+
+  // Estimates based on standard poultry data (in KG per day)
+  const getEstimatedFeedRate = (stage: BirdStage): number => {
+    switch (stage) {
+        case BirdStage.Chick: return 0.05; // 50g approx (avg over 8 weeks)
+        case BirdStage.Pullet: return 0.08; // 80g approx
+        case BirdStage.Hen: return 0.12; // 120g approx
+        case BirdStage.Rooster: return 0.13; // 130g approx
+        default: return 0.1;
+    }
+  };
 
   const filteredBirds = birds.filter(b => {
     const matchesBreed = filterBreed === 'All' || b.breed === filterBreed;
@@ -100,7 +115,8 @@ export const FlockManager: React.FC = () => {
         stage: BirdStage.Chick,
         status: 'Active',
         hatchDate: new Date().toISOString().split('T')[0],
-        notes: ''
+        notes: '',
+        feedInventoryId: ''
     });
     setShowBirdModal(true);
   };
@@ -144,7 +160,8 @@ export const FlockManager: React.FC = () => {
             stage: currentBird.stage as BirdStage,
             hatchDate: currentBird.hatchDate!,
             status: currentBird.status as any,
-            notes: currentBird.notes
+            notes: currentBird.notes,
+            feedInventoryId: currentBird.feedInventoryId
         };
         setBirds(prev => [newBird, ...prev]);
     }
@@ -267,6 +284,13 @@ export const FlockManager: React.FC = () => {
           const isSelected = selectedIds.has(bird.id);
           const breedProfile = getBreedProfile(bird.breed);
           
+          // Feed Calculations
+          const estimatedDailyIntake = getEstimatedFeedRate(bird.stage) * (bird.status === 'Active' ? bird.count : 0);
+          const linkedFeed = inventory.find(i => i.id === bird.feedInventoryId);
+          const feedDaysRemaining = linkedFeed && estimatedDailyIntake > 0 
+            ? Math.floor(linkedFeed.quantity / estimatedDailyIntake) 
+            : null;
+
           return (
             <div key={bird.id} 
                 onClick={(e) => selectedIds.size > 0 ? toggleSelection(bird.id, e) : undefined}
@@ -323,20 +347,56 @@ export const FlockManager: React.FC = () => {
                   </div>
                </div>
 
+                {/* Info Grid */}
                <div className="grid grid-cols-3 gap-3 pl-2">
                   <div className="bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Stage</p>
                      <p className="text-xs font-black text-slate-900">{bird.stage}</p>
                   </div>
                    <div className="bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
-                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Age</p>
-                     <p className="text-xs font-black text-slate-900">{ageText}</p>
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Req. Feed</p>
+                     <p className="text-xs font-black text-slate-900">{estimatedDailyIntake.toFixed(2)} kg/d</p>
                   </div>
                    <div className="bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Type</p>
                      <p className="text-xs font-black text-slate-900">{bird.count > 1 ? 'Batch' : 'Single'}</p>
                   </div>
                </div>
+
+                {/* Feed Guide / Status */}
+                <div className="pl-2">
+                    <div className={`p-4 rounded-2xl border flex items-center justify-between
+                        ${linkedFeed 
+                            ? (feedDaysRemaining !== null && feedDaysRemaining < 3 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200')
+                            : 'bg-slate-50 border-slate-100'
+                        }`}
+                    >
+                         <div className="flex items-center gap-3">
+                             <div className={`p-2 rounded-lg ${linkedFeed ? 'bg-white' : 'bg-slate-200'} text-slate-600`}>
+                                 <Utensils size={16} />
+                             </div>
+                             <div>
+                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Feed Source</p>
+                                 <p className="text-xs font-bold text-slate-900">{linkedFeed ? linkedFeed.name : 'No Feed Assigned'}</p>
+                             </div>
+                         </div>
+                         {linkedFeed && feedDaysRemaining !== null && (
+                             <div className="text-right">
+                                 <p className={`text-xs font-black ${feedDaysRemaining < 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                     {feedDaysRemaining} Days
+                                 </p>
+                                 <p className="text-[9px] font-bold text-slate-400 uppercase">Supply Left</p>
+                             </div>
+                         )}
+                         {!linkedFeed && bird.status === 'Active' && (
+                             <div className="flex items-center gap-1 text-amber-500 text-[10px] font-bold uppercase tracking-wide">
+                                 <AlertTriangle size={12} />
+                                 <span>Missing Link</span>
+                             </div>
+                         )}
+                    </div>
+                </div>
+
             </div>
           );
         })}
@@ -480,6 +540,34 @@ export const FlockManager: React.FC = () => {
                           >
                               {Object.values(BirdStage).map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
+                      </div>
+
+                      {/* Feed Guide Configuration */}
+                      <div className="md:col-span-2 bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100">
+                           <div className="flex justify-between items-center mb-4">
+                               <label className="text-[10px] font-black text-emerald-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                                   <Utensils size={14} /> Feed Guide & Source
+                               </label>
+                               <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">
+                                   Req: ~{getEstimatedFeedRate(currentBird.stage as BirdStage) * (currentBird.count || 1)} kg/day
+                               </span>
+                           </div>
+                           
+                           <select 
+                                value={currentBird.feedInventoryId || ''}
+                                onChange={(e) => setCurrentBird({...currentBird, feedInventoryId: e.target.value})}
+                                className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-xl outline-none text-sm text-slate-900 font-bold focus:ring-4 focus:ring-emerald-500/5 appearance-none cursor-pointer"
+                            >
+                                <option value="">Select Inventory Item to Deduct From...</option>
+                                {getFeedItems().map(item => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.name} ({item.quantity} {item.unit} available)
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-emerald-600/70 mt-2 font-medium">
+                                Linking this flock to an inventory item allows for accurate stock forecasting.
+                            </p>
                       </div>
 
                       <div className="md:col-span-2 bg-amber-50/50 p-6 rounded-3xl border border-amber-100">

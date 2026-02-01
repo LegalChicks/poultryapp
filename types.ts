@@ -45,6 +45,7 @@ export interface Bird {
   notes?: string;
   photoUrl?: string;
   status: 'Active' | 'Sold' | 'Deceased';
+  feedInventoryId?: string; // ID of the feed inventory item this flock consumes
 }
 
 export interface EggLogEntry {

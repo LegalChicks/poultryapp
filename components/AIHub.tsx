@@ -1,31 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FunctionDeclaration, GoogleGenAI, Type } from "@google/genai";
-import { Send, Bot, Sparkles, Activity, TrendingUp, AlertCircle, Loader2, FileText, Lock, ExternalLink, Zap } from 'lucide-react';
-import { Bird, EggLogEntry, Transaction, ManualTask } from '../types';
+import { Send, Bot, Sparkles, Activity, TrendingUp, Loader2, Lock, Key, Zap, CheckCircle, LogOut, MessageSquare } from 'lucide-react';
 import { usePersistentState } from '../hooks/usePersistentState';
 
 type Tab = 'chat' | 'health' | 'analysis';
 
 interface Message {
   id: string;
-  role: 'user' | 'model';
-  text: string;
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 export const AIHub: React.FC = () => {
-  const [hasApiKey, setHasApiKey] = useState(false);
+  const [apiKey, setApiKey] = usePersistentState<string>('openai_api_key', '');
+  const [inputKey, setInputKey] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('chat');
-  const [tasks, setTasks] = usePersistentState<ManualTask[]>('poultry_tasks', []);
-
+  
   // Chat State
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'model', text: 'Greetings, Farmer. I am Gemini, your strategic poultry consultant. I have analyzed your flock metrics. How can I assist with your RIRs and Australorps today?' }
+    { id: '1', role: 'assistant', content: 'Hello! I am your ChatGPT poultry assistant. I can help with flock management, health diagnostics, and market insights. How can I help you today?' }
   ]);
   const [input, setInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Health & Analysis States...
+  // Health & Analysis States
   const [symptoms, setSymptoms] = useState('');
   const [birdAge, setBirdAge] = useState('');
   const [healthAnalysis, setHealthAnalysis] = useState('');
@@ -33,157 +31,147 @@ export const AIHub: React.FC = () => {
   const [analysisReport, setAnalysisReport] = useState('');
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
 
-  useEffect(() => {
-    const checkKey = async () => {
-      if ((window as any).aistudio && await (window as any).aistudio.hasSelectedApiKey()) setHasApiKey(true);
-    };
-    checkKey();
-  }, []);
-
   useEffect(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
 
-  const handleConnect = async () => {
-    if ((window as any).aistudio) {
-        try {
-            await (window as any).aistudio.openSelectKey();
-            setHasApiKey(true);
-        } catch (error) {}
-    }
-  };
-
-  const createAIClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-  const handleAPIError = (error: any) => {
-      console.error(error);
-      if (error.toString().includes("Requested entity was not found")) {
-          setHasApiKey(false);
-          return "Session expired. Re-authenticate to continue.";
+  const handleSaveKey = () => {
+      if (inputKey.trim().startsWith('sk-')) {
+          setApiKey(inputKey.trim());
+      } else {
+          alert("Please enter a valid OpenAI API Key starting with 'sk-'");
       }
-      return "Gemini service temporarily unavailable.";
   };
 
-  const createTaskTool: FunctionDeclaration = {
-    name: 'createTask',
-    description: 'Schedule a new manual operational task.',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            description: { type: Type.STRING, description: 'Task description.' },
-            dueDate: { type: Type.STRING, description: 'ISO Date YYYY-MM-DD.' }
-        },
-        required: ['description', 'dueDate']
+  const handleDisconnect = () => {
+      setApiKey('');
+      setInputKey('');
+  };
+
+  const callOpenAI = async (msgs: any[], systemPrompt?: string) => {
+    try {
+        const payloadMessages = systemPrompt 
+            ? [{ role: "system", content: systemPrompt }, ...msgs] 
+            : msgs;
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: "gpt-4o",
+                messages: payloadMessages,
+                temperature: 0.7
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error.message || 'API Error');
+        }
+
+        return data.choices[0].message.content;
+    } catch (error: any) {
+        console.error("OpenAI API Error:", error);
+        throw error;
     }
   };
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', text: input };
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: input };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsChatLoading(true);
 
     try {
-      const ai = createAIClient();
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `You are an elite poultry farm consultant. Today is ${new Date().toISOString().split('T')[0]}. Handle tasks with the createTask tool. User asks: ${input}`,
-        config: { tools: [{ functionDeclarations: [createTaskTool] }] }
-      });
+      // Prepare context from recent messages
+      const apiMessages = messages.slice(-5).map(m => ({ role: m.role, content: m.content }));
+      apiMessages.push({ role: 'user', content: input });
 
-      const functionCalls = response.candidates?.[0]?.content?.parts?.filter(p => p.functionCall)?.map(p => p.functionCall);
+      const responseText = await callOpenAI(apiMessages, "You are an expert poultry farm consultant. Provide concise, practical advice for managing Rhode Island Reds and Black Australorps.");
       
-      if (functionCalls && functionCalls.length > 0) {
-          const call = functionCalls[0]!;
-          if (call.name === 'createTask') {
-              const args = call.args as any;
-              const newTask: ManualTask = {
-                  id: `task-${Date.now()}`,
-                  description: args.description,
-                  dueDate: args.dueDate,
-                  completed: false,
-                  createdAt: new Date().toISOString()
-              };
-              const currentTasks = JSON.parse(localStorage.getItem('poultry_tasks') || '[]');
-              const updatedTasks = [newTask, ...currentTasks];
-              localStorage.setItem('poultry_tasks', JSON.stringify(updatedTasks));
-              setTasks(updatedTasks);
-
-              const toolResponse = await ai.models.generateContent({
-                  model: 'gemini-3-flash-preview',
-                  contents: [
-                      { role: 'user', parts: [{ text: input }] },
-                      { role: 'model', parts: [{ functionCall: call }] },
-                      { role: 'user', parts: [{ functionResponse: { name: 'createTask', response: { result: 'Operation scheduled.' } } }] }
-                  ]
-              });
-              setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: toolResponse.text || "Task scheduled." }]);
-          }
-      } else {
-        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: response.text || "Understood." }]);
-      }
-    } catch (error) {
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: handleAPIError(error) }]);
+      setMessages(prev => [...prev, { 
+          id: (Date.now() + 1).toString(), 
+          role: 'assistant', 
+          content: responseText
+      }]);
+    } catch (error: any) {
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `Error: ${error.message}. Please check your API key.` }]);
     } finally {
       setIsChatLoading(false);
     }
   };
 
-  // Rest of handlers (Health, Analysis) remain functional but with UI updates...
   const handleHealthCheck = async () => {
     if (!symptoms.trim()) return;
     setIsHealthLoading(true);
     try {
-      const ai = createAIClient();
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Veterinary diagnosis for ${birdAge || 'poultry'}: ${symptoms}`,
-      });
-      setHealthAnalysis(response.text || "Analysis complete.");
-    } catch (error) { setHealthAnalysis(handleAPIError(error)); } finally { setIsHealthLoading(false); }
+      const prompt = `Veterinary diagnosis request.\nSubject Age: ${birdAge || 'Unknown'}.\nSymptoms: ${symptoms}.\n\nProvide a differential diagnosis, potential treatments, and recommended next steps. Note: Disclaimer that you are an AI, not a vet.`;
+      const response = await callOpenAI([{ role: "user", content: prompt }], "You are an expert veterinary assistant specializing in poultry health.");
+      setHealthAnalysis(response);
+    } catch (error: any) { 
+        setHealthAnalysis(`Analysis failed: ${error.message}`); 
+    } finally { 
+        setIsHealthLoading(false); 
+    }
   };
 
   const handleGenerateReport = async () => {
     setIsAnalysisLoading(true);
     try {
-      const ai = createAIClient();
       const birds = JSON.parse(localStorage.getItem('poultry_birds') || '[]');
       const eggs = JSON.parse(localStorage.getItem('poultry_eggs') || '[]');
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Generate a production efficiency report. Current flock: ${birds.length}. Recent logs: ${JSON.stringify(eggs.slice(0, 10))}`,
-      });
-      setAnalysisReport(response.text || "Report generated.");
-    } catch (error) { setAnalysisReport(handleAPIError(error)); } finally { setIsAnalysisLoading(false); }
+      
+      const prompt = `Generate a farm production analysis.\nContext: ${birds.length} birds in flock. Recent egg logs (last 5 days): ${JSON.stringify(eggs.slice(0, 5))}.\n\nAnalyze production efficiency, suggest improvements, and provide general market context for poultry farmers.`;
+      
+      const response = await callOpenAI([{ role: "user", content: prompt }], "You are an agricultural economist and poultry farm manager.");
+      setAnalysisReport(response);
+    } catch (error: any) { 
+        setAnalysisReport(`Report generation failed: ${error.message}`); 
+    } finally { 
+        setIsAnalysisLoading(false); 
+    }
   };
 
-  if (!hasApiKey) {
+  if (!apiKey) {
       return (
           <div className="h-[calc(100vh-10rem)] flex flex-col items-center justify-center p-8 space-y-8 text-center animate-in fade-in zoom-in duration-500">
               <div className="relative">
-                  <div className="absolute inset-0 blur-3xl ai-shimmer opacity-20 rounded-full scale-150"></div>
-                  <div className="relative p-6 bg-slate-900 rounded-3xl text-indigo-400 shadow-2xl">
-                      <Sparkles size={64} strokeWidth={1.5} />
+                  <div className="absolute inset-0 blur-3xl bg-emerald-500/20 rounded-full scale-150"></div>
+                  <div className="relative p-6 bg-slate-900 rounded-3xl text-emerald-400 shadow-2xl">
+                      <Bot size={64} strokeWidth={1.5} />
                   </div>
               </div>
               <div>
-                  <h1 className="text-4xl font-black text-slate-900 tracking-tight">Activate Intelligence</h1>
+                  <h1 className="text-4xl font-black text-slate-900 tracking-tight">Connect ChatGPT</h1>
                   <p className="text-slate-500 max-w-lg mt-4 text-lg font-medium">
-                      Unlock high-performance diagnostics and automated task scheduling powered by Google Gemini.
+                      Power your farm management with OpenAI's GPT-4o. Enter your API key to begin.
                   </p>
               </div>
               
-              <div className="p-1.5 bg-slate-900/5 rounded-4xl w-full max-w-md">
+              <div className="w-full max-w-md space-y-4">
+                   <div className="relative">
+                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input 
+                            type="password" 
+                            placeholder="sk-..." 
+                            value={inputKey}
+                            onChange={(e) => setInputKey(e.target.value)}
+                            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-mono text-sm"
+                        />
+                   </div>
                    <button 
-                      onClick={handleConnect}
-                      className="w-full py-4 px-8 bg-slate-900 text-white rounded-[2rem] font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-slate-900/20"
+                      onClick={handleSaveKey}
+                      disabled={!inputKey}
+                      className="w-full py-4 px-8 bg-slate-900 text-white rounded-[2rem] font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl disabled:opacity-50"
                    >
-                       <Zap size={20} className="text-amber-400 fill-amber-400" />
-                       Link Gemini API
+                       <Zap size={20} className="text-emerald-400 fill-emerald-400" />
+                       Connect API
                    </button>
+                   <p className="text-xs text-slate-400 font-medium">Your key is stored locally in your browser.</p>
               </div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <Lock size={12} /> Securely Managed via AI Studio
-              </p>
           </div>
       );
   }
@@ -192,28 +180,37 @@ export const AIHub: React.FC = () => {
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-            <div className="p-3 ai-shimmer rounded-2xl text-white shadow-xl">
+            <div className="p-3 bg-slate-900 rounded-2xl text-emerald-400 shadow-xl">
                 <Sparkles size={28} />
             </div>
             <div>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gemini Advisor</h1>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">ChatGPT Assistant</h1>
                 <div className="flex items-center gap-2 mt-1">
                     <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Neural Link Active</span>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">GPT-4o Connected</span>
                 </div>
             </div>
         </div>
-        <div className="hidden lg:flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
-            {(['chat', 'health', 'analysis'] as Tab[]).map(tab => (
-                <button 
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all
-                    ${activeTab === tab ? 'bg-white text-slate-900 shadow-premium' : 'text-slate-500 hover:text-slate-900'}`}
-                >
-                    {tab}
-                </button>
-            ))}
+        <div className="flex items-center gap-3">
+            <div className="hidden lg:flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
+                {(['chat', 'health', 'analysis'] as Tab[]).map(tab => (
+                    <button 
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all
+                        ${activeTab === tab ? 'bg-white text-slate-900 shadow-premium' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                        {tab}
+                    </button>
+                ))}
+            </div>
+            <button 
+                onClick={handleDisconnect}
+                className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-rose-500 transition-colors"
+                title="Disconnect API Key"
+            >
+                <LogOut size={20} />
+            </button>
         </div>
       </div>
 
@@ -223,34 +220,39 @@ export const AIHub: React.FC = () => {
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
                     {messages.map((msg) => (
                         <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                            <div className={`max-w-[75%] rounded-3xl px-6 py-4 text-[15px] font-medium leading-relaxed shadow-sm
+                            <div className={`max-w-[85%] rounded-3xl px-6 py-4 text-[15px] font-medium leading-relaxed shadow-sm
                                 ${msg.role === 'user' 
                                     ? 'bg-slate-900 text-white rounded-br-none' 
                                     : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none'
                                 }`}>
-                                {msg.role === 'model' && <Bot size={18} className="inline-block mr-2 mb-1 text-indigo-500" />}
-                                <span className="whitespace-pre-wrap">{msg.text}</span>
+                                {msg.role === 'assistant' && (
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
+                                        <Bot size={14} className="text-emerald-600" />
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">ChatGPT</span>
+                                    </div>
+                                )}
+                                <span className="whitespace-pre-wrap markdown-body">{msg.content}</span>
                             </div>
                         </div>
                     ))}
                     {isChatLoading && (
                         <div className="flex justify-start">
                              <div className="bg-white px-6 py-4 rounded-3xl rounded-bl-none border border-slate-200 flex items-center gap-3">
-                                <Loader2 size={18} className="animate-spin text-indigo-500" />
-                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Synthesizing...</span>
+                                <Loader2 size={18} className="animate-spin text-emerald-600" />
+                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">ChatGPT is thinking...</span>
                              </div>
                         </div>
                     )}
                     <div ref={chatEndRef} />
                 </div>
                 <div className="p-6 bg-white border-t border-slate-100">
-                    <div className="flex gap-3 bg-slate-100 p-2 rounded-[2rem] border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+                    <div className="flex gap-3 bg-slate-100 p-2 rounded-[2rem] border border-slate-200 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
                         <input 
                             type="text" 
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                            placeholder="Type a query or 'Schedule vaccination for Monday'..."
+                            placeholder="Ask about feed ratios, disease symptoms, or profit margins..."
                             className="flex-1 bg-transparent px-6 py-2 text-sm font-medium outline-none text-slate-900 placeholder-slate-400"
                         />
                         <button 
@@ -265,7 +267,6 @@ export const AIHub: React.FC = () => {
             </div>
         )}
 
-        {/* Other Tabs with similar redesign... */}
         {activeTab === 'health' && (
             <div className="h-full flex flex-col lg:flex-row">
                 <div className="lg:w-80 p-8 border-b lg:border-b-0 lg:border-r border-slate-100 bg-slate-50/30">
@@ -282,15 +283,18 @@ export const AIHub: React.FC = () => {
                             <textarea value={symptoms} onChange={e => setSymptoms(e.target.value)} rows={5} placeholder="Describe observable symptoms..." className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-rose-500/20 outline-none font-medium resize-none" />
                         </div>
                         <button onClick={handleHealthCheck} disabled={isHealthLoading || !symptoms} className="w-full py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 transition-all shadow-xl shadow-rose-900/10 flex items-center justify-center gap-2">
-                            {isHealthLoading ? <Loader2 size={16} className="animate-spin" /> : <Activity size={16} />}
-                            Run Diagnostics
+                            {isHealthLoading ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}
+                            Analyze with AI
                         </button>
                     </div>
                 </div>
                 <div className="flex-1 p-8 overflow-y-auto bg-white">
                     {healthAnalysis ? (
                         <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-                            <h3 className="text-xl font-extrabold text-slate-900 mb-6">AI Assessment Report</h3>
+                            <h3 className="text-xl font-extrabold text-slate-900 mb-6 flex items-center gap-3">
+                                <Sparkles size={24} className="text-emerald-500" />
+                                AI Diagnosis
+                            </h3>
                             <div className="whitespace-pre-wrap text-slate-700 leading-relaxed font-medium bg-slate-50 border border-slate-100 rounded-3xl p-8 shadow-inner-soft">
                                 {healthAnalysis}
                             </div>
@@ -309,19 +313,19 @@ export const AIHub: React.FC = () => {
             <div className="h-full flex flex-col p-8 overflow-y-auto">
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
                     <div>
-                        <h3 className="text-2xl font-black text-slate-900">Advanced Analytics</h3>
-                        <p className="text-slate-400 font-medium mt-1">Cross-referencing flock health, finance, and laying logs.</p>
+                        <h3 className="text-2xl font-black text-slate-900">Market Intelligence</h3>
+                        <p className="text-slate-400 font-medium mt-1">AI-driven analysis of your farm's production data.</p>
                     </div>
                     <button onClick={handleGenerateReport} disabled={isAnalysisLoading} className="w-full lg:w-auto px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900/10 flex items-center justify-center gap-2">
-                        {isAnalysisLoading ? <Loader2 size={16} className="animate-spin" /> : <TrendingUp size={16} />}
-                        Synthesize Report
+                        {isAnalysisLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                        Generate Report
                     </button>
                 </div>
                 {analysisReport ? (
                      <div className="bg-indigo-950 text-indigo-100 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-500 relative overflow-hidden">
                          <div className="absolute top-0 right-0 p-8 opacity-10"><TrendingUp size={120} /></div>
                          <div className="flex items-center gap-3 mb-6 text-indigo-400 font-black uppercase tracking-[0.2em] text-[10px]">
-                            <Sparkles size={16} /> Gemini Performance Audit
+                            <Bot size={16} /> Strategy Report
                          </div>
                          <div className="whitespace-pre-wrap text-lg leading-relaxed font-medium relative z-10">
                              {analysisReport}
@@ -330,7 +334,7 @@ export const AIHub: React.FC = () => {
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-300 border-4 border-dashed border-slate-50 rounded-[3rem] bg-slate-50/30">
                         <TrendingUp size={64} className="mb-6 opacity-10" />
-                        <p className="font-bold uppercase tracking-widest text-xs">Awaiting data input for synthesis</p>
+                        <p className="font-bold uppercase tracking-widest text-xs">Awaiting data synthesis</p>
                     </div>
                 )}
             </div>
