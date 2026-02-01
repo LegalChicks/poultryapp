@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MOCK_BIRDS, DEFAULT_BREED_PROFILES, MOCK_INVENTORY } from '../constants';
 import { Bird, BirdStage, BreedProfile, InventoryItem } from '../types';
-import { Search, Filter, Plus, X, Save, Edit2, Calendar, Trash2, CheckSquare, Square, Layers, Utensils, AlertTriangle, ArrowRight } from 'lucide-react';
-import { usePersistentState } from '../hooks/usePersistentState';
+import { Search, Filter, Plus, X, Save, Edit2, Calendar, Trash2, CheckSquare, Square, Layers, Utensils, AlertTriangle, ArrowRight, User, Smartphone } from 'lucide-react';
+import { usePersistentState, withAudit } from '../hooks/usePersistentState';
 
 export const FlockManager: React.FC = () => {
   const [birds, setBirds] = usePersistentState<Bird[]>('poultry_birds', MOCK_BIRDS);
@@ -149,9 +149,10 @@ export const FlockManager: React.FC = () => {
     const finalCount = recordType === 'Individual' ? 1 : Math.max(1, currentBird.count || 1);
 
     if (isEditing && currentBird.id) {
-        setBirds(prev => prev.map(b => b.id === currentBird.id ? { ...b, ...currentBird, count: finalCount } as Bird : b));
+        // Apply withAudit to track who changed it
+        setBirds(prev => prev.map(b => b.id === currentBird.id ? withAudit({ ...b, ...currentBird, count: finalCount } as Bird) : b));
     } else {
-        const newBird: Bird = {
+        const newBird: Bird = withAudit({
             id: `bird-${Date.now()}`,
             tagNumber: currentBird.tagNumber!,
             name: currentBird.name,
@@ -162,7 +163,7 @@ export const FlockManager: React.FC = () => {
             status: currentBird.status as any,
             notes: currentBird.notes,
             feedInventoryId: currentBird.feedInventoryId
-        };
+        });
         setBirds(prev => [newBird, ...prev]);
     }
     setShowBirdModal(false);
@@ -189,7 +190,7 @@ export const FlockManager: React.FC = () => {
   const executeBatchUpdate = (value: string) => {
       setBirds(prev => prev.map(b => {
           if (selectedIds.has(b.id)) {
-              return { ...b, [batchActionField!]: value };
+              return withAudit({ ...b, [batchActionField!]: value });
           }
           return b;
       }));
@@ -397,6 +398,16 @@ export const FlockManager: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Audit Trail - Only visible if metadata exists */}
+                {bird.lastModifiedBy && (
+                   <div className="pl-2 mt-2 pt-2 border-t border-slate-100 flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+                       <User size={10} />
+                       <span>{bird.lastModifiedBy}</span>
+                       <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                       <Smartphone size={10} />
+                       <span>{bird.lastModifiedDevice}</span>
+                   </div>
+                )}
             </div>
           );
         })}
@@ -735,35 +746,6 @@ export const FlockManager: React.FC = () => {
                 )}
              </div>
          </div>
-      )}
-
-      {/* Batch Delete Confirmation */}
-      {showBatchDelete && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
-           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 text-center">
-              <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                 <Layers size={32} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">Batch Delete?</h3>
-              <p className="text-slate-500 font-medium mb-8">
-                You are about to delete <strong className="text-slate-900">{selectedIds.size}</strong> records. This cannot be undone.
-              </p>
-              <div className="flex flex-col gap-3">
-                 <button 
-                    onClick={executeBatchDelete}
-                    className="w-full py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-xl shadow-rose-900/10"
-                 >
-                    Yes, Delete {selectedIds.size} Items
-                 </button>
-                 <button 
-                    onClick={() => setShowBatchDelete(false)}
-                    className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
-                 >
-                    Cancel
-                 </button>
-              </div>
-           </div>
-        </div>
       )}
     </div>
   );

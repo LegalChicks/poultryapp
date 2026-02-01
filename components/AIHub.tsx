@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, Sparkles, Activity, TrendingUp, Loader2, Lock, Key, Zap, CheckCircle, LogOut, MessageSquare } from 'lucide-react';
-import { usePersistentState } from '../hooks/usePersistentState';
+import { Send, Bot, Sparkles, Activity, TrendingUp, Loader2, MessageSquare } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 
 type Tab = 'chat' | 'health' | 'analysis';
 
@@ -11,13 +11,11 @@ interface Message {
 }
 
 export const AIHub: React.FC = () => {
-  const [apiKey, setApiKey] = usePersistentState<string>('openai_api_key', '');
-  const [inputKey, setInputKey] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('chat');
   
   // Chat State
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'assistant', content: 'Hello! I am your ChatGPT poultry assistant. I can help with flock management, health diagnostics, and market insights. How can I help you today?' }
+    { id: '1', role: 'assistant', content: 'Hello! I am your Gemini poultry assistant. I can help with flock management, health diagnostics, and market insights. How can I help you today?' }
   ]);
   const [input, setInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -33,51 +31,6 @@ export const AIHub: React.FC = () => {
 
   useEffect(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
 
-  const handleSaveKey = () => {
-      if (inputKey.trim().startsWith('sk-')) {
-          setApiKey(inputKey.trim());
-      } else {
-          alert("Please enter a valid OpenAI API Key starting with 'sk-'");
-      }
-  };
-
-  const handleDisconnect = () => {
-      setApiKey('');
-      setInputKey('');
-  };
-
-  const callOpenAI = async (msgs: any[], systemPrompt?: string) => {
-    try {
-        const payloadMessages = systemPrompt 
-            ? [{ role: "system", content: systemPrompt }, ...msgs] 
-            : msgs;
-
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: "gpt-4o",
-                messages: payloadMessages,
-                temperature: 0.7
-            })
-        });
-
-        const data = await response.json();
-        
-        if (data.error) {
-            throw new Error(data.error.message || 'API Error');
-        }
-
-        return data.choices[0].message.content;
-    } catch (error: any) {
-        console.error("OpenAI API Error:", error);
-        throw error;
-    }
-  };
-
   const handleSendMessage = async () => {
     if (!input.trim()) return;
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: input };
@@ -86,19 +39,28 @@ export const AIHub: React.FC = () => {
     setIsChatLoading(true);
 
     try {
-      // Prepare context from recent messages
-      const apiMessages = messages.slice(-5).map(m => ({ role: m.role, content: m.content }));
-      apiMessages.push({ role: 'user', content: input });
-
-      const responseText = await callOpenAI(apiMessages, "You are an expert poultry farm consultant. Provide concise, practical advice for managing Rhode Island Reds and Black Australorps.");
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
+      const history = messages.slice(-5).map(m => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+      }));
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: [...history, { role: 'user', parts: [{ text: input }] }],
+        config: {
+            systemInstruction: "You are an expert poultry farm consultant. Provide concise, practical advice for managing Rhode Island Reds and Black Australorps.",
+        }
+      });
       
       setMessages(prev => [...prev, { 
           id: (Date.now() + 1).toString(), 
           role: 'assistant', 
-          content: responseText
+          content: response.text || "I couldn't generate a response."
       }]);
     } catch (error: any) {
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `Error: ${error.message}. Please check your API key.` }]);
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `Error: ${error.message}. Please check your API key configuration.` }]);
     } finally {
       setIsChatLoading(false);
     }
@@ -108,9 +70,17 @@ export const AIHub: React.FC = () => {
     if (!symptoms.trim()) return;
     setIsHealthLoading(true);
     try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const prompt = `Veterinary diagnosis request.\nSubject Age: ${birdAge || 'Unknown'}.\nSymptoms: ${symptoms}.\n\nProvide a differential diagnosis, potential treatments, and recommended next steps. Note: Disclaimer that you are an AI, not a vet.`;
-      const response = await callOpenAI([{ role: "user", content: prompt }], "You are an expert veterinary assistant specializing in poultry health.");
-      setHealthAnalysis(response);
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: prompt,
+        config: {
+            systemInstruction: "You are an expert veterinary assistant specializing in poultry health.",
+        }
+      });
+      setHealthAnalysis(response.text || "No analysis generated.");
     } catch (error: any) { 
         setHealthAnalysis(`Analysis failed: ${error.message}`); 
     } finally { 
@@ -121,60 +91,26 @@ export const AIHub: React.FC = () => {
   const handleGenerateReport = async () => {
     setIsAnalysisLoading(true);
     try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const birds = JSON.parse(localStorage.getItem('poultry_birds') || '[]');
       const eggs = JSON.parse(localStorage.getItem('poultry_eggs') || '[]');
       
       const prompt = `Generate a farm production analysis.\nContext: ${birds.length} birds in flock. Recent egg logs (last 5 days): ${JSON.stringify(eggs.slice(0, 5))}.\n\nAnalyze production efficiency, suggest improvements, and provide general market context for poultry farmers.`;
       
-      const response = await callOpenAI([{ role: "user", content: prompt }], "You are an agricultural economist and poultry farm manager.");
-      setAnalysisReport(response);
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: prompt,
+        config: {
+            systemInstruction: "You are an agricultural economist and poultry farm manager.",
+        }
+      });
+      setAnalysisReport(response.text || "No report generated.");
     } catch (error: any) { 
         setAnalysisReport(`Report generation failed: ${error.message}`); 
     } finally { 
         setIsAnalysisLoading(false); 
     }
   };
-
-  if (!apiKey) {
-      return (
-          <div className="h-[calc(100vh-10rem)] flex flex-col items-center justify-center p-8 space-y-8 text-center animate-in fade-in zoom-in duration-500">
-              <div className="relative">
-                  <div className="absolute inset-0 blur-3xl bg-emerald-500/20 rounded-full scale-150"></div>
-                  <div className="relative p-6 bg-slate-900 rounded-3xl text-emerald-400 shadow-2xl">
-                      <Bot size={64} strokeWidth={1.5} />
-                  </div>
-              </div>
-              <div>
-                  <h1 className="text-4xl font-black text-slate-900 tracking-tight">Connect ChatGPT</h1>
-                  <p className="text-slate-500 max-w-lg mt-4 text-lg font-medium">
-                      Power your farm management with OpenAI's GPT-4o. Enter your API key to begin.
-                  </p>
-              </div>
-              
-              <div className="w-full max-w-md space-y-4">
-                   <div className="relative">
-                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                        <input 
-                            type="password" 
-                            placeholder="sk-..." 
-                            value={inputKey}
-                            onChange={(e) => setInputKey(e.target.value)}
-                            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-mono text-sm"
-                        />
-                   </div>
-                   <button 
-                      onClick={handleSaveKey}
-                      disabled={!inputKey}
-                      className="w-full py-4 px-8 bg-slate-900 text-white rounded-[2rem] font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl disabled:opacity-50"
-                   >
-                       <Zap size={20} className="text-emerald-400 fill-emerald-400" />
-                       Connect API
-                   </button>
-                   <p className="text-xs text-slate-400 font-medium">Your key is stored locally in your browser.</p>
-              </div>
-          </div>
-      );
-  }
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -184,10 +120,10 @@ export const AIHub: React.FC = () => {
                 <Sparkles size={28} />
             </div>
             <div>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">ChatGPT Assistant</h1>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gemini Assistant</h1>
                 <div className="flex items-center gap-2 mt-1">
                     <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">GPT-4o Connected</span>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gemini-3 Pro Connected</span>
                 </div>
             </div>
         </div>
@@ -204,13 +140,6 @@ export const AIHub: React.FC = () => {
                     </button>
                 ))}
             </div>
-            <button 
-                onClick={handleDisconnect}
-                className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-rose-500 transition-colors"
-                title="Disconnect API Key"
-            >
-                <LogOut size={20} />
-            </button>
         </div>
       </div>
 
@@ -228,7 +157,7 @@ export const AIHub: React.FC = () => {
                                 {msg.role === 'assistant' && (
                                     <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
                                         <Bot size={14} className="text-emerald-600" />
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">ChatGPT</span>
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gemini</span>
                                     </div>
                                 )}
                                 <span className="whitespace-pre-wrap markdown-body">{msg.content}</span>
@@ -239,7 +168,7 @@ export const AIHub: React.FC = () => {
                         <div className="flex justify-start">
                              <div className="bg-white px-6 py-4 rounded-3xl rounded-bl-none border border-slate-200 flex items-center gap-3">
                                 <Loader2 size={18} className="animate-spin text-emerald-600" />
-                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">ChatGPT is thinking...</span>
+                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Gemini is thinking...</span>
                              </div>
                         </div>
                     )}

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { MOCK_EGG_LOG, DEFAULT_BREED_PROFILES } from '../constants';
 import { EggLogEntry, BreedProfile } from '../types';
 import { Egg, AlertCircle, Calendar, Plus, Save, X, Edit2, TrendingUp, Trash2, Filter, CheckSquare, Square, Search, PieChart } from 'lucide-react';
-import { usePersistentState } from '../hooks/usePersistentState';
+import { usePersistentState, withAudit } from '../hooks/usePersistentState';
 
 type DateFilter = '7days' | '30days' | 'month' | 'all';
 
@@ -76,14 +76,14 @@ export const EggLogManager: React.FC = () => {
   const handleSave = () => {
      if(!currentEntry.date || currentEntry.count === undefined) return;
      
-     const entryPayload: EggLogEntry = {
+     const entryPayload: EggLogEntry = withAudit({
          id: (isEditing && currentEntry.id) ? currentEntry.id : `log-${Date.now()}`,
          date: currentEntry.date,
          count: Math.max(0, Number(currentEntry.count)),
          damaged: Math.max(0, Number(currentEntry.damaged || 0)),
          notes: currentEntry.notes,
          breed: currentEntry.breed || 'Mixed'
-     };
+     });
 
      if(isEditing) {
          setLogs(prev => prev.map(l => l.id === entryPayload.id ? entryPayload : l));
@@ -143,6 +143,10 @@ export const EggLogManager: React.FC = () => {
       setIsEditing(true);
       setCurrentEntry({...entry});
       setShowModal(true);
+  };
+
+  const deleteBatch = () => {
+      confirmDelete(Array.from(selectedIds));
   };
 
   return (
@@ -295,7 +299,7 @@ export const EggLogManager: React.FC = () => {
                         <span className="font-bold text-sm hidden sm:inline">Selected</span>
                     </div>
                     <button 
-                        onClick={() => confirmDelete(Array.from(selectedIds))}
+                        onClick={deleteBatch}
                         className="p-3 rounded-xl bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center gap-2 px-4"
                     >
                         <Trash2 size={18} />

@@ -5,6 +5,12 @@ export enum Breed {
   Other = 'Other'
 }
 
+export interface AuditMetadata {
+  lastModifiedBy?: string;
+  lastModifiedDevice?: string;
+  lastModifiedAt?: string;
+}
+
 export interface BreedProfile {
   id: string;
   name: string; // Full name
@@ -34,7 +40,7 @@ export enum HealthEventType {
   Other = 'Other'
 }
 
-export interface Bird {
+export interface Bird extends AuditMetadata {
   id: string;
   tagNumber: string;
   name?: string;
@@ -48,7 +54,7 @@ export interface Bird {
   feedInventoryId?: string; // ID of the feed inventory item this flock consumes
 }
 
-export interface EggLogEntry {
+export interface EggLogEntry extends AuditMetadata {
   id: string;
   date: string;
   count: number;
@@ -57,7 +63,7 @@ export interface EggLogEntry {
   breed?: string | 'Mixed'; // Changed from Breed enum
 }
 
-export interface IncubationBatch {
+export interface IncubationBatch extends AuditMetadata {
   id: string;
   startDate: string;
   projectedHatchDate: string;
@@ -68,7 +74,7 @@ export interface IncubationBatch {
   status: 'Incubating' | 'Hatched' | 'Failed';
 }
 
-export interface Transaction {
+export interface Transaction extends AuditMetadata {
   id: string;
   date: string;
   description: string;
@@ -77,7 +83,7 @@ export interface Transaction {
   category: 'Feed' | 'Medicine' | 'Equipment' | 'Egg Sales' | 'Bird Sales' | 'Other';
 }
 
-export interface InventoryItem {
+export interface InventoryItem extends AuditMetadata {
   id: string;
   name: string;
   category: 'Feed' | 'Medicine' | 'Supplies' | 'Product';
@@ -92,7 +98,7 @@ export interface InventoryItem {
   lastAutoDeductDate?: string;
 }
 
-export interface HealthRecord {
+export interface HealthRecord extends AuditMetadata {
   id: string;
   date: string;
   type: HealthEventType;
@@ -119,5 +125,7 @@ export interface LoginLog {
   timestamp: string;
   ipAddress: string;
   deviceInfo: string;
+  userAlias?: string;
+  deviceName?: string;
   status: 'Success' | 'Failed';
 }

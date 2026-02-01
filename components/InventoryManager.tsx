@@ -3,9 +3,9 @@ import { MOCK_INVENTORY } from '../constants';
 import { InventoryItem } from '../types';
 import { 
   Search, Plus, Minus, AlertTriangle, 
-  ShoppingCart, ClipboardList, X, FileText, Check, Edit2, Save, Trash2, Zap
+  ShoppingCart, ClipboardList, X, FileText, Check, Edit2, Save, Trash2, Zap, User, Smartphone
 } from 'lucide-react';
-import { usePersistentState } from '../hooks/usePersistentState';
+import { usePersistentState, withAudit } from '../hooks/usePersistentState';
 
 export const InventoryManager: React.FC = () => {
   const [items, setItems] = usePersistentState<InventoryItem[]>('poultry_inventory', MOCK_INVENTORY);
@@ -35,7 +35,8 @@ export const InventoryManager: React.FC = () => {
     setItems(items.map(item => {
         if (item.id === id) {
             const newQty = Math.max(0, item.quantity + delta);
-            return { ...item, quantity: newQty, lastUpdated: new Date().toISOString().split('T')[0] };
+            // Auto-audit on quick adjust
+            return withAudit({ ...item, quantity: newQty, lastUpdated: new Date().toISOString().split('T')[0] });
         }
         return item;
     }));
@@ -91,9 +92,9 @@ export const InventoryManager: React.FC = () => {
       if (!currentItem.name || !currentItem.unit) return; // Basic validation
 
       if (isEditing && currentItem.id) {
-          setItems(items.map(i => i.id === currentItem.id ? { ...i, ...currentItem, lastUpdated: new Date().toISOString().split('T')[0] } as InventoryItem : i));
+          setItems(items.map(i => i.id === currentItem.id ? withAudit({ ...i, ...currentItem, lastUpdated: new Date().toISOString().split('T')[0] } as InventoryItem) : i));
       } else {
-          const newItem: InventoryItem = {
+          const newItem: InventoryItem = withAudit({
               id: `inv-${Date.now()}`,
               name: currentItem.name,
               category: currentItem.category as any,
@@ -103,7 +104,7 @@ export const InventoryManager: React.FC = () => {
               lastUpdated: new Date().toISOString().split('T')[0],
               isAutoFeed: currentItem.isAutoFeed,
               dailyRatePerBird: Number(currentItem.dailyRatePerBird || 0)
-          };
+          });
           setItems([...items, newItem]);
       }
       setShowItemModal(false);
@@ -235,6 +236,17 @@ export const InventoryManager: React.FC = () => {
                              </button>
                         </div>
                     </div>
+                    
+                    {/* Audit Trail */}
+                    {item.lastModifiedBy && (
+                       <div className="mt-4 pt-2 border-t border-gray-50 flex items-center gap-2 text-[10px] text-gray-400 font-medium justify-center">
+                           <User size={10} />
+                           <span>{item.lastModifiedBy}</span>
+                           <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                           <Smartphone size={10} />
+                           <span>{item.lastModifiedDevice}</span>
+                       </div>
+                    )}
                 </div>
             );
         })}
